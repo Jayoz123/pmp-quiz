@@ -1,0 +1,11 @@
+[
+  "tools/test_pipeline.py::test_convert_basic",
+  "tools/test_pipeline.py::test_convert_correct_answer_preserved",
+  "tools/test_pipeline.py::test_convert_skips_invalid_correct",
+  "tools/test_pipeline.py::test_infer_domain_cost",
+  "tools/test_pipeline.py::test_infer_domain_fallback",
+  "tools/test_pipeline.py::test_infer_domain_risk",
+  "tools/test_pipeline.py::test_letter_to_index_mapping",
+  "tools/test_pipeline.py::test_parse_questions_minimal",
+  "tools/test_pipeline.py::test_remove_duplicates_basic"
+]
