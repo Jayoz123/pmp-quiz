@@ -198,8 +198,10 @@ const StatsManager = {
 // ==================== APP STATE ====================
 const AppState = {
   questions: [],
-  quizSession: null,   // { questions, current, answers, mode }
+  quizSession: null,   // { questions, current, answers, mode, shuffledMap }
   lastSummary: null,   // { correct, total, percent, bestStreak, weakestDomain, streakExtended, mode }
+  pendingMode: null,
+  pendingDomains: [],
 };
 
 // ==================== VIEWS ====================
@@ -371,7 +373,7 @@ Views['mode-select'] = {
       alert('Brak pytań dla wybranych filtrów. Zmień ustawienia.');
       return;
     }
-    AppState.quizSession = { questions, current: 0, answers: [], mode: this._selectedMode };
+    AppState.quizSession = { questions, current: 0, answers: [], mode: this._selectedMode, shuffledMap: {} };
     this._selectedDomains = [];
     this._selectedMode = 'quick';
     App.navigate('quiz');
@@ -386,22 +388,26 @@ Views['daily-start'] = {
     return `<div class="loading-screen"><div class="loading-spinner"></div></div>`;
   },
   init() {
+    if (StreakManager.isDailyDoneToday()) {
+      App.navigate('home');
+      return;
+    }
     const questions = QuizEngine.selectQuestions(AppState.questions, 'daily');
-    AppState.quizSession = { questions, current: 0, answers: [], mode: 'daily' };
+    AppState.quizSession = { questions, current: 0, answers: [], mode: 'daily', shuffledMap: {} };
     App.navigate('quiz');
   },
 };
 
 // ==================== QUIZ VIEW ====================
 Views.quiz = {
-  _shuffled: null,
-
   render() {
     const session = AppState.quizSession;
     if (!session) { App.navigate('home'); return ''; }
     const q = session.questions[session.current];
-    this._shuffled = QuizEngine.shuffleAnswers(q);
-    const { displayAnswers } = this._shuffled;
+    if (!session.shuffledMap[session.current]) {
+      session.shuffledMap[session.current] = QuizEngine.shuffleAnswers(q);
+    }
+    const { displayAnswers } = session.shuffledMap[session.current];
     const total = session.questions.length;
     const pct = Math.round((session.current / total) * 100);
     const letters = ['A', 'B', 'C', 'D'];
@@ -431,7 +437,7 @@ Views.quiz = {
   _selectAnswer(selectedIndex) {
     const session = AppState.quizSession;
     const q = session.questions[session.current];
-    const { correctDisplayIndex } = this._shuffled;
+    const { correctDisplayIndex } = session.shuffledMap[session.current];
     const isCorrect = selectedIndex === correctDisplayIndex;
 
     document.querySelectorAll('.answer-btn').forEach(btn => {
@@ -603,7 +609,7 @@ Views.summary = {
           </div>` : ''}
         </div>
         <div class="summary__actions">
-          <button class="btn-secondary" onclick="App.navigate('home')">Menu</button>
+          <button class="btn-secondary" onclick="App.navigate('home')">Wróć do menu</button>
           <button class="btn-primary" style="flex:1"
                   onclick="Views.summary._replay()">Zagraj ponownie</button>
         </div>
@@ -719,13 +725,4 @@ Views.stats = {
   },
 
   init() {
-    setTimeout(() => {
-      document.querySelectorAll('.domain-bar__fill[data-target]').forEach(el => {
-        el.style.width = el.dataset.target + '%';
-      });
-    }, 100);
-  },
-};
-
-// ==================== BOOT ====================
-document.addEventListener('DOMContentLoaded', () => App.init());
+    set

@@ -138,6 +138,15 @@ const StatsManager = {
     if (!recent.length) return null;
     return Math.round(recent.reduce((s, r) => s + r.percent, 0) / recent.length);
   },
+  getPerDomain(questions) {
+    const history = Storage.getHistory();
+    const domains = [...new Set(questions.map(q => q.domain).filter(Boolean))].sort();
+    return domains.map(domain => {
+      const entries = history.flatMap(r => r.domainResults || []).filter(d => d.domain === domain);
+      if (!entries.length) return { domain, percent: null };
+      return { domain, percent: Math.round(entries.reduce((s, d) => s + d.percent, 0) / entries.length) };
+    });
+  },
   getTotals() {
     const h = Storage.getHistory();
     return { quizzes: h.length, answered: h.reduce((s, r) => s + (r.total || 0), 0) };
