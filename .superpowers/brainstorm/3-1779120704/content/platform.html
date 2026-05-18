@@ -1,0 +1,67 @@
+<h2>Pytanie 1 z 5: Platforma aplikacji</h2>
+<p class="subtitle">Powiedziałeś "aplikacja na Androida" — ale warto rozważyć alternatywy zanim zaczniemy</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="pwa" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); display:flex; align-items:center; justify-content:center; height:80px; font-size:2rem;">🌐</div>
+    <div class="card-body">
+      <h3>Progressive Web App (PWA)</h3>
+      <p>Aplikacja webowa działająca jak natywna. Instalowana przez Chrome na Androidzie, dostępna też na desktop i iOS.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Zalety</h4><ul>
+          <li>Najszybsza do zbudowania</li>
+          <li>Działa wszędzie (Android, iOS, PC)</li>
+          <li>Brak Google Play — zero formalności</li>
+          <li>Łatwe aktualizacje pytań przez Excel</li>
+        </ul></div>
+        <div class="cons"><h4>Wady</h4><ul>
+          <li>Nie jest "prawdziwą" apką ze Sklepu Play</li>
+          <li>Powiadomienia push trudniejsze</li>
+        </ul></div>
+      </div>
+      <p style="margin-top:8px; padding:6px 10px; background:rgba(79,70,229,0.1); border-radius:6px; font-size:0.85rem;">⭐ <strong>Rekomendacja</strong> — dla egzaminu PMP to idealne rozwiązanie. Mogę ją zbudować w pełni i szybko.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="react_native" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: linear-gradient(135deg, #0EA5E9 0%, #06B6D4 100%); display:flex; align-items:center; justify-content:center; height:80px; font-size:2rem;">📱</div>
+    <div class="card-body">
+      <h3>React Native</h3>
+      <p>Prawdziwa natywna apka na Androida i iOS z jednej bazy kodu JavaScript.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Zalety</h4><ul>
+          <li>Natywny wygląd i działanie</li>
+          <li>Można publikować w Google Play</li>
+          <li>Android + iOS jednocześnie</li>
+        </ul></div>
+        <div class="cons"><h4>Wady</h4><ul>
+          <li>Wymaga Node.js, Android Studio, JDK</li>
+          <li>Budowanie APK — długi setup</li>
+          <li>Znacznie więcej pracy do wdrożenia</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="flutter" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: linear-gradient(135deg, #06B6D4 0%, #0284C7 100%); display:flex; align-items:center; justify-content:center; height:80px; font-size:2rem;">🎯</div>
+    <div class="card-body">
+      <h3>Flutter / Kotlin</h3>
+      <p>Natywna apka Android. Najlepsza wydajność i animacje.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Zalety</h4><ul>
+          <li>Najlepsza wydajność i animacje</li>
+          <li>Świetne gotowe komponenty Material Design</li>
+          <li>Profesjonalny efekt końcowy</li>
+        </ul></div>
+        <div class="cons"><h4>Wady</h4><ul>
+          <li>Wymaga Dart lub Kotlin — setup środowiska</li>
+          <li>Najtrudniejszy do zbudowania w tym kontekście</li>
+          <li>Nie mogę bezpośrednio uruchomić i przetestować</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
