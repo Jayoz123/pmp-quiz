@@ -13,6 +13,11 @@
 <body>
   <div id="app"></div>
   <div id="badge-popup" class="badge-popup hidden" aria-live="polite"></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
+    }
+  </script>
   <script src="app.js"></script>
 </body>
 </html>
