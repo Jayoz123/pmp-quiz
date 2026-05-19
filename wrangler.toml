@@ -1,2 +1,5 @@
 name = "pmp-quiz-app"
-pages_build_output_dir = "pmp-quiz-app"
+compatibility_date = "2024-01-01"
+
+[assets]
+directory = "pmp-quiz-app"
