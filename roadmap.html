@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PMP Exam App — Roadmap</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f4f6f9;
+    color: #1a1a2e;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+
+  .header { max-width: 860px; margin: 0 auto 28px auto; }
+  .header h1 { font-size: 1.75rem; font-weight: 700; color: #1a1a2e; letter-spacing: -0.5px; }
+  .header p { color: #666; margin-top: 6px; font-size: 0.93rem; }
+
+  /* Risk banner */
+  .risk-banner {
+    max-width: 860px;
+    margin: 0 auto 28px auto;
+    background: #fff8f6;
+    border: 1.5px solid #fcd4c8;
+    border-radius: 12px;
+    padding: 18px 22px;
+  }
+  .risk-banner h3 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #c0392b;
+    margin-bottom: 12px;
+  }
+  .risk-list { display: flex; flex-direction: column; gap: 7px; }
+  .risk-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: #555;
+    line-height: 1.4;
+  }
+  .risk-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+  .rd-critical { background: #e74c3c; }
+  .rd-high     { background: #e67e22; }
+  .rd-medium   { background: #f1c40f; }
+  .risk-row strong { color: #333; }
+
+  /* Global progress */
+  .global-progress {
+    max-width: 860px;
+    margin: 0 auto 28px auto;
+    background: white;
+    border-radius: 12px;
+    padding: 18px 22px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .global-progress .label {
+    display: flex; justify-content: space-between;
+    font-size: 0.85rem; font-weight: 600; color: #555; margin-bottom: 10px;
+  }
+  .bar-wrap { background: #eef0f5; border-radius: 99px; height: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #6c63ff, #48c9b0); transition: width 0.4s ease; }
+
+  /* Phases */
+  .phases { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  .phase {
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+    border-left: 5px solid #ddd;
+  }
+  .phase.p0 { border-color: #6c63ff; }
+  .phase.p1 { border-color: #3b9ede; }
+  .phase.p2 { border-color: #f5a623; }
+  .phase.p3 { border-color: #e74c3c; }
+  .phase.p4 { border-color: #48c9b0; }
+
+  .phase-header { padding: 18px 22px 14px 22px; cursor: pointer; user-select: none; }
+  .phase-header .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .phase-title { display: flex; align-items: center; gap: 12px; }
+
+  .phase-badge {
+    font-size: 0.7rem; font-weight: 700; padding: 3px 9px;
+    border-radius: 99px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .p0 .phase-badge { background: #ede9ff; color: #6c63ff; }
+  .p1 .phase-badge { background: #e3f2fd; color: #3b9ede; }
+  .p2 .phase-badge { background: #fff8ec; color: #f5a623; }
+  .p3 .phase-badge { background: #fdecea; color: #e74c3c; }
+  .p4 .phase-badge { background: #e8faf6; color: #48c9b0; }
+
+  .phase-name { font-size: 1rem; font-weight: 700; color: #1a1a2e; }
+  .phase-meta { font-size: 0.8rem; color: #999; margin-top: 3px; }
+
+  .phase-progress-row { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
+  .phase-bar-wrap { flex: 1; background: #f0f2f7; border-radius: 99px; height: 6px; overflow: hidden; }
+  .phase-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
+  .p0 .phase-bar-fill { background: #6c63ff; }
+  .p1 .phase-bar-fill { background: #3b9ede; }
+  .p2 .phase-bar-fill { background: #f5a623; }
+  .p3 .phase-bar-fill { background: #e74c3c; }
+  .p4 .phase-bar-fill { background: #48c9b0; }
+
+  .phase-count { font-size: 0.78rem; font-weight: 600; color: #999; white-space: nowrap; }
+  .chevron { font-size: 1.1rem; color: #bbb; transition: transform 0.25s; flex-shrink: 0; margin-top: 2px; }
+  .phase.open .chevron { transform: rotate(180deg); }
+
+  .phase-body { display: none; padding: 4px 22px 20px 22px; border-top: 1px solid #f0f2f7; }
+  .phase.open .phase-body { display: block; }
+
+  .section-title {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.8px; color: #bbb; margin: 16px 0 8px 0;
+  }
+
+  /* Task items */
+  .task-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 9px 0; border-bottom: 1px solid #f7f7fb; cursor: pointer;
+  }
+  .task-item:last-child { border-bottom: none; }
+  .task-item input[type="checkbox"] { display: none; }
+
+  .custom-check {
+    width: 18px; height: 18px; border: 2px solid #d0d4e0;
+    border-radius: 5px; flex-shrink: 0; margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; background: white;
+  }
+  .task-item.done .custom-check { border-color: transparent; background: #6c63ff; }
+  .p1 .task-item.done .custom-check { background: #3b9ede; }
+  .p2 .task-item.done .custom-check { background: #f5a623; }
+  .p3 .task-item.done .custom-check { background: #e74c3c; }
+  .p4 .task-item.done .custom-check { background: #48c9b0; }
+
+  .check-icon { display: none; color: white; font-size: 11px; font-weight: 700; }
+  .task-item.done .check-icon { display: block; }
+
+  .task-text { flex: 1; }
+  .task-label { font-size: 0.9rem; color: #2d2d3a; line-height: 1.4; transition: color 0.2s; }
+  .task-item.done .task-label { text-decoration: line-through; color: #b0b4c0; }
+  .task-note { font-size: 0.78rem; color: #aaa; margin-top: 2px; line-height: 1.4; }
+
+  /* Tags */
+  .tag {
+    display: inline-block; font-size: 0.68rem; font-weight: 600;
+    padding: 1px 7px; border-radius: 99px; margin-left: 6px;
+    vertical-align: middle; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .tag-tech  { background: #ede9ff; color: #6c63ff; }
+  .tag-ux    { background: #e3f2fd; color: #3b9ede; }
+  .tag-biz   { background: #fff8ec; color: #e09600; }
+  .tag-legal { background: #fdecea; color: #e74c3c; }
+  .tag-risk  { background: #fdecea; color: #c0392b; }
+  .tag-content { background: #e8f8f0; color: #27ae60; }
+
+  /* Risk badge on task */
+  .risk-flag {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 5px;
+    margin-top: 2px;
+    white-space: nowrap;
+  }
+  .rf-critical { background: #fdecea; color: #c0392b; }
+  .rf-high     { background: #fff3e0; color: #d35400; }
+
+  .footer {
+    max-width: 860px; margin: 32px auto 0 auto;
+    text-align: center; font-size: 0.78rem; color: #ccc;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>PMP Exam App — Roadmap</h1>
+  <p>Zaktualizowano o ryzyka z sesji "Critical PMP App Idea Evaluation". Kliknij zadanie żeby oznaczyć jako wykonane.</p>
+</div>
+
+<!-- RISK SUMMARY -->
+<div class="risk-banner">
+  <h3>⚠ Ryzyka zidentyfikowane w Critical Evaluation — wymagają adresowania w roadmapie</h3>
+  <div class="risk-list">
+    <div class="risk-row"><div class="risk-dot rd-critical"></div><div><strong>KRYTYCZNE:</strong> Auto-advance 1500ms na poprawnej odpowiedzi aktywnie szkodzi nauce — użytkownik pomija wyjaśnienia przy pytaniach które "wie". Błąd pedagogiczny nr 1.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-critical"></div><div><strong>KRYTYCZNE:</strong> Brak trybu symulacji egzaminu (180 pytań, timer, flagowanie) — aplikacja nie buduje "wytrzymałości egzaminacyjnej".</div></div>
+    <div class="risk-row"><div class="risk-dot rd-critical"></div><div><strong>KRYTYCZNE:</strong> Źródła pytań z PDF-ów trzecich stron — ryzyko nieaktualności (ECO 2023: ~50% pytań agile/hybrydowe), błędów merytorycznych i kwestii copyright.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-high"></div><div><strong>WYSOKIE:</strong> localStorage jako jedyne repozytorium — Android czyści dane agresywnie. Tygodnie serii i historia błędów mogą zniknąć bez ostrzeżenia.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-high"></div><div><strong>WYSOKIE:</strong> Service Worker cache versioning hardcoded (v1) — po aktualizacji questions.json użytkownik może tygodniami uczyć się z outdated bazy nie wiedząc o tym.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-high"></div><div><strong>WYSOKIE:</strong> Brak toggle EN/PL — nauka wyłącznie z polskiego tłumaczenia przy egzaminie prowadzonym po angielsku; błędy tłumaczeniowe niewidoczne.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-medium"></div><div><strong>ŚREDNIE:</strong> "Słabe pytania" odblokowane dopiero po 10 błędach — odwrócona motywacja. Na początku nauki, gdy masz najwięcej słabości, tryb jest niedostępny.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-medium"></div><div><strong>ŚREDNIE:</strong> Weighted random ≠ SRS. To samo błędne pytanie może pojawić się 3 razy z rzędu w ciągu godziny zamiast następnego dnia na progu zapomnienia. Brak cooldown.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-medium"></div><div><strong>ŚREDNIE:</strong> Brak metapoznania ("Jak pewny/a jesteś?") — false positives (odpowiedź zgadnięta poprawnie) niewidoczne. Właśnie one zabijają na egzaminie.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-medium"></div><div><strong>ŚREDNIE:</strong> localStorage limit ~5–10MB — przy dużej bazie pytań + historia quizów możliwy overflow. Docelowo migracja do IndexedDB.</div></div>
+    <div class="risk-row"><div class="risk-dot rd-medium"></div><div><strong>ŚREDNIE:</strong> Brak analizy per typ pytania (sytuacyjne / def. / oblicz.) — wynik per domena to za mało; nie wiadomo JAKIEGO myślenia brakuje.</div></div>
+  </div>
+</div>
+
+<!-- GLOBAL PROGRESS -->
+<div class="global-progress">
+  <div class="label">
+    <span>Postęp globalny</span>
+    <span id="global-label">0 / 0 zadań</span>
+  </div>
+  <div class="bar-wrap"><div class="bar-fill" id="global-bar" style="width:0%"></div></div>
+</div>
+
+<div class="phases" id="phases">
+
+  <!-- FAZA 0 -->
+  <div class="phase p0 open" data-phase="p0">
+    <div class="phase-header" onclick="togglePhase(this)">
+      <div class="top-row">
+        <div class="phase-title">
+          <span class="phase-badge">Faza 0</span>
+          <div>
+            <div class="phase-name">Fundament techniczno-pedagogiczny</div>
+            <div class="phase-meta">Cel: działający backend + apka połączona z Supabase + naprawione błędy pedagogiczne</div>
+          </div>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="phase-progress-row">
+        <div class="phase-bar-wrap"><div class="phase-bar-fill" style="width:0%"></div></div>
+        <span class="phase-count">—</span>
+      </div>
+    </div>
+    <div class="phase-body">
+
+      <div class="section-title">🔴 Naprawy krytyczne — przed pierwszym testerem</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Usuń auto-advance (1500ms) przy poprawnej odpowiedzi <span class="tag tag-risk">Ryzyko kryt.</span></div>
+          <div class="task-note">Pokaż wyjaśnienie zawsze — zarówno przy błędnej jak i poprawnej odpowiedzi. Przejście tylko ręcznie. To jest błąd pedagogiczny nr 1 całej aplikacji.</div>
+        </div>
+        <span class="risk-flag rf-critical">KRYT.</span>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Dodaj toggle EN / PL do każdego pytania i wyjaśnienia <span class="tag tag-ux">UX</span></div>
+          <div class="task-note">Przycisk "Pokaż oryginał" pokazuje angielską wersję pytania i odpowiedzi. Egzamin jest po angielsku — tester musi móc skonfrontować tłumaczenie ze źródłem.</div>
+        </div>
+        <span class="risk-flag rf-critical">KRYT.</span>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Napraw Service Worker cache versioning — hash-based invalidation <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Zamień hardcoded 'pmp-quiz-v1' na hash questions.json generowany przy buildzie. Bez tego: aktualizacja pytań nie trafia do użytkownika przez tygodnie.</div>
+        </div>
+        <span class="risk-flag rf-high">WYSOK.</span>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Napraw logikę SRS — dodaj cooldown min. 15 pytań przed re-show błędnego <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Obecny weighted random może pokazać to samo pytanie 3x z rzędu. Błędne pytanie powinno wracać następnego dnia, nie po chwili — zgodnie z krzywą zapominania.</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Napraw logikę odblokowania trybu "Słabe pytania" <span class="tag tag-ux">UX</span></div>
+          <div class="task-note">Odblokuj po ukończeniu DOWOLNEGO quizu (nie po 10 błędach). Na początku nauki, gdy masz najwięcej słabości, tryb musi być dostępny od razu.</div>
+        </div>
+      </div>
+
+      <div class="section-title">Supabase — setup</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Załóż konto na supabase.com i utwórz nowy projekt <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Wybierz region EU (Frankfurt) dla zgodności z RODO</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zaprojektuj schemat bazy danych <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Tabele: users, questions (z polami en_text, pl_text), user_progress, translation_reports, quiz_sessions</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Skonfiguruj autentykację (email + Google OAuth) <span class="tag tag-tech">Tech</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Skonfiguruj Row Level Security (RLS) <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Każdy użytkownik widzi tylko swoje dane postępu — obowiązkowe dla RODO</div>
+        </div>
+      </div>
+
+      <div class="section-title">Integracja z aplikacją Android</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Dodaj Supabase SDK do projektu Android (supabase-kt) <span class="tag tag-tech">Tech</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zaimplementuj logowanie i rejestrację użytkownika <span class="tag tag-tech">Tech</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zaimplementuj sync postępu użytkownika z bazą <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Rozwiązuje ryzyko utraty danych z localStorage przy czyszczeniu przez Android. Historia błędów, serie, odznaki — wszystko w Supabase.</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zaimplementuj aktualizację bazy pytań z serwera (wersjonowanie) <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Zastępuje hardcoded SW cache versioning. Apka sprawdza wersję bazy przy starcie i pobiera delta.</div>
+        </div>
+      </div>
+
+      <div class="section-title">Prawno-formalne</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Napisz i opublikuj politykę prywatności pod publicznym URL <span class="tag tag-legal">Legal</span></div>
+          <div class="task-note">Wymagana przez Google Play. Hostuj jako statyczny plik na Cloudflare Pages (free).</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FAZA 1 -->
+  <div class="phase p1" data-phase="p1">
+    <div class="phase-header" onclick="togglePhase(this)">
+      <div class="top-row">
+        <div class="phase-title">
+          <span class="phase-badge">Faza 1</span>
+          <div>
+            <div class="phase-name">Beta zamknięta — testerzy + jakość treści</div>
+            <div class="phase-meta">Cel: 20–30 aktywnych testerów, zweryfikowane tłumaczenia, poprawki UX</div>
+          </div>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="phase-progress-row">
+        <div class="phase-bar-wrap"><div class="phase-bar-fill" style="width:0%"></div></div>
+        <span class="phase-count">—</span>
+      </div>
+    </div>
+    <div class="phase-body">
+
+      <div class="section-title">🔴 Jakość i legalność pytań — przed beta</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Sprawdź status copyright źródeł PDF (Questions-and-Answers, All-In-One-Guide) <span class="tag tag-legal">Legal</span></div>
+          <div class="task-note">Reprodukcja chronionych treści z komercyjnych prep-booków w aplikacji publicznej = ryzyko prawne. Ustal: czy możesz używać tych pytań w aplikacji płatnej?</div>
+        </div>
+        <span class="risk-flag rf-critical">KRYT.</span>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Oceń zgodność bazy pytań z aktualnym ECO 2023 (agile/hybrydowe podejście) <span class="tag tag-content">Treść</span></div>
+          <div class="task-note">Od aktualizacji 2021: ~50% pytań egzaminacyjnych dotyczy agile/hybrydowych podejść. Stare prep-booki mogą tego nie odzwierciedlać. Przejrzyj próbkę 50 pytań z perspektywy ECO.</div>
+        </div>
+        <span class="risk-flag rf-high">WYSOK.</span>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zbuduj słownik terminologii PMP (EN→PL) jako standard tłumaczeń <span class="tag tag-content">Treść</span></div>
+          <div class="task-note">Risk appetite, lessons learned, change request, servant leadership — każdy termin powinien mieć ustaloną polską wersję. Bez tego każdy tłumacz tłumaczy inaczej.</div>
+        </div>
+      </div>
+
+      <div class="section-title">Rekrutacja testerów</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Utwórz serwer Discord lub grupę dla testerów <span class="tag tag-biz">Org</span></div>
+          <div class="task-note">Kanały: #błędy-merytoryczne, #błędy-tłumaczeń, #pomysły-na-funkcje</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Przygotuj formularz rekrutacyjny i opublikuj ogłoszenie (LinkedIn, grupy PMI Polska) <span class="tag tag-biz">Org</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Wyślij zaproszenia do Google Play Closed Testing (min. 20 osób) <span class="tag tag-biz">Org</span></div>
+        </div>
+      </div>
+
+      <div class="section-title">Funkcja zgłaszania błędów w aplikacji</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Dodaj przycisk "Zgłoś problem" (ikona flagi) do każdego pytania <span class="tag tag-ux">UX</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zaimplementuj ścieżkę A: Błąd merytoryczny (opis tekstowy → Supabase) <span class="tag tag-tech">Tech</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zaimplementuj ścieżkę B: Błąd tłumaczenia (edytor inline EN+PL → Supabase queue) <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Tester widzi oryginał EN i obecne PL — edytuje PL i zatwierdza. Trafia do kolejki pending_review, Ty akceptujesz/odrzucasz.</div>
+        </div>
+      </div>
+
+      <div class="section-title">UX — funkcje pedagogiczne (nowe z Critical Evaluation)</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Dodaj mechanizm metapoznania: "Jak pewny/a jesteś?" przed odpowiedzią <span class="tag tag-ux">UX</span></div>
+          <div class="task-note">Skala 1–3 przed wyborem odpowiedzi. Pozwala identyfikować false positives — odpowiedzi zgadnięte poprawnie, które zabiją na egzaminie. Można włączyć/wyłączyć w ustawieniach.</div>
+        </div>
+      </div>
+
+      <div class="section-title">Iteracja na feedbacku</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Przeprowadź 2 rundy weryfikacji tłumaczeń z testerami <span class="tag tag-biz">Org</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zbierz i wdróż top 10 sugestii UX od testerów <span class="tag tag-ux">UX</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FAZA 2 -->
+  <div class="phase p2" data-phase="p2">
+    <div class="phase-header" onclick="togglePhase(this)">
+      <div class="top-row">
+        <div class="phase-title">
+          <span class="phase-badge">Faza 2</span>
+          <div>
+            <div class="phase-name">Przygotowanie do Google Play</div>
+            <div class="phase-meta">Cel: gotowa aplikacja do recenzji Google + tryb egzaminacyjny</div>
+          </div>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="phase-progress-row">
+        <div class="phase-bar-wrap"><div class="phase-bar-fill" style="width:0%"></div></div>
+        <span class="phase-count">—</span>
+      </div>
+    </div>
+    <div class="phase-body">
+
+      <div class="section-title">🔴 Funkcje krytyczne dla egzaminu — brakujące w v1</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Tryb symulacji egzaminu: 180 pytań, timer 230min, flagowanie pytań do review <span class="tag tag-ux">UX</span></div>
+          <div class="task-note">Bez tego aplikacja nie buduje "wytrzymałości egzaminacyjnej". PM-owie często oblają przez zmęczenie, nie brak wiedzy. Kluczowa funkcja przed launche.</div>
+        </div>
+        <span class="risk-flag rf-critical">KRYT.</span>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Analiza wyników per TYP pytania (sytuacyjne / definicyjne / obliczeniowe / wartościujące) <span class="tag tag-ux">UX</span></div>
+          <div class="task-note">Wynik per domena to za mało. Użytkownik musi wiedzieć nie "z czego" słabo — ale "jakie MYŚLENIE PMI" mu nie wychodzi.</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Migracja przechowywania danych: localStorage → IndexedDB <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">LocalStorage limit ~5–10MB. Przy dużej bazie pytań + historii quizów możliwy overflow. IndexedDB nie ma limitu. Refactor przed produkcją, nie po.</div>
+        </div>
+        <span class="risk-flag rf-high">WYSOK.</span>
+      </div>
+
+      <div class="section-title">Google Play Console</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Załóż konto Google Play Console ($25 jednorazowo) <span class="tag tag-biz">Biz</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Przygotuj grafikę sklepu (ikona 512×512, screenshoty, feature graphic 1024×500) <span class="tag tag-ux">UX</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Napisz opis aplikacji w sklepie (PL + EN) z keywords <span class="tag tag-biz">Biz</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Wypełnij Data Safety section <span class="tag tag-legal">Legal</span></div>
+          <div class="task-note">Obowiązkowe — deklaracja jakie dane zbierasz i w jakim celu</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Wygeneruj podpisany APK / AAB (release build) <span class="tag tag-tech">Tech</span></div>
+        </div>
+      </div>
+
+      <div class="section-title">Monetyzacja</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zdefiniuj podział free vs premium (200 pytań free / pełna baza jako jednorazowy IAP) <span class="tag tag-biz">Biz</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Zintegruj Google Play Billing Library + przetestuj IAP <span class="tag tag-tech">Tech</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FAZA 3 -->
+  <div class="phase p3" data-phase="p3">
+    <div class="phase-header" onclick="togglePhase(this)">
+      <div class="top-row">
+        <div class="phase-title">
+          <span class="phase-badge">Faza 3</span>
+          <div>
+            <div class="phase-name">Launch publiczny</div>
+            <div class="phase-meta">Cel: aplikacja w Google Play, pierwsze organiczne recenzje</div>
+          </div>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="phase-progress-row">
+        <div class="phase-bar-wrap"><div class="phase-bar-fill" style="width:0%"></div></div>
+        <span class="phase-count">—</span>
+      </div>
+    </div>
+    <div class="phase-body">
+
+      <div class="section-title">Publikacja</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Prześlij aplikację do recenzji Google (Production track) <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Czas oczekiwania: 3–7 dni roboczych przy pierwszej publikacji</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Opublikuj post launch na LinkedIn i w społecznościach PMI Polska <span class="tag tag-biz">Biz</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Poproś testerów beta o recenzje w sklepie (pierwsze recenzje = widoczność) <span class="tag tag-biz">Biz</span></div>
+        </div>
+      </div>
+
+      <div class="section-title">Monitoring</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Skonfiguruj Firebase Crashlytics (raportowanie błędów produkcyjnych) <span class="tag tag-tech">Tech</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Monitoruj recenzje i odpowiadaj na każdą w pierwszym tygodniu <span class="tag tag-biz">Biz</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FAZA 4 -->
+  <div class="phase p4" data-phase="p4">
+    <div class="phase-header" onclick="togglePhase(this)">
+      <div class="top-row">
+        <div class="phase-title">
+          <span class="phase-badge">Faza 4</span>
+          <div>
+            <div class="phase-name">Wzrost i funkcje premium</div>
+            <div class="phase-meta">Cel: retencja, pozytywne recenzje, przychód, ekspansja</div>
+          </div>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="phase-progress-row">
+        <div class="phase-bar-wrap"><div class="phase-bar-fill" style="width:0%"></div></div>
+        <span class="phase-count">—</span>
+      </div>
+    </div>
+    <div class="phase-body">
+
+      <div class="section-title">Funkcje angażujące</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Leaderboard — tygodniowy ranking użytkowników (anonimowe pseudonimy) <span class="tag tag-tech">Tech</span></div>
+          <div class="task-note">Tygodniowy reset zwiększa aktywność. RODO-safe dzięki pseudonimom.</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Dashboard analityki nauki: słabe obszary, streak, predykcja gotowości <span class="tag tag-ux">UX</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Powiadomienia push — dzienny reminder do nauki <span class="tag tag-tech">Tech</span></div>
+        </div>
+      </div>
+
+      <div class="section-title">Strategiczne (z Critical Evaluation)</div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Odpowiedz na pytanie strategiczne: nauka na egzamin czy nauka PM-a? Udokumentuj decyzję. <span class="tag tag-biz">Biz</span></div>
+          <div class="task-note">Aplikacja optymalizowana pod zdanie PMP (pattern recognition) to inny produkt niż aplikacja budująca realną wiedzę PM. Wybór determinuje wszystkie decyzje UX.</div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Aktualizacja pytań pod nową wersję PMBOK / ECO gdy wyjdzie <span class="tag tag-content">Treść</span></div>
+        </div>
+      </div>
+
+      <div class="task-item" onclick="toggle(this)">
+        <input type="checkbox"><div class="custom-check"><span class="check-icon">✓</span></div>
+        <div class="task-text">
+          <div class="task-label">Wersja angielska aplikacji (rynek globalny — PMP zdawany globalnie) <span class="tag tag-biz">Biz</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Zaktualizowano o ryzyka z "Critical PMP App Idea Evaluation" &nbsp;·&nbsp; ostatnia zmiana: <span id="last-update">—</span>
+</div>
+
+<script>
+  const STORAGE_KEY = 'pmp_roadmap_v2';
+
+  function getState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    document.getElementById('last-update').textContent = new Date().toLocaleDateString('pl-PL', {day:'2-digit', month:'long', year:'numeric'});
+  }
+
+  function toggle(item) {
+    item.classList.toggle('done');
+    const id = getTaskId(item);
+    const state = getState();
+    state[id] = item.classList.contains('done');
+    saveState(state);
+    updateAll();
+  }
+
+  function getTaskId(item) {
+    const label = item.querySelector('.task-label').textContent.trim().substring(0, 50);
+    return btoa(unescape(encodeURIComponent(label))).substring(0, 24);
+  }
+
+  function togglePhase(header) {
+    header.closest('.phase').classList.toggle('open');
+  }
+
+  function updateAll() {
+    const allItems = document.querySelectorAll('.task-item');
+    const doneAll = document.querySelectorAll('.task-item.done').length;
+    const totalAll = allItems.length;
+
+    document.getElementById('global-label').textContent = `${doneAll} / ${totalAll} zadań`;
+    document.getElementById('global-bar').style.width = totalAll ? (doneAll / totalAll * 100) + '%' : '0%';
+
+    document.querySelectorAll('.phase').forEach(phase => {
+      const items = phase.querySelectorAll('.task-item');
+      const done = phase.querySelectorAll('.task-item.done').length;
+      const total = items.length;
+      const pct = total ? Math.round(done / total * 100) : 0;
+      phase.querySelector('.phase-bar-fill').style.width = pct + '%';
+      phase.querySelector('.phase-count').textContent = `${done}/${total}`;
+    });
+  }
+
+  function restoreState() {
+    const state = getState();
+    document.querySelectorAll('.task-item').forEach(item => {
+      const id = getTaskId(item);
+      if (state[id]) item.classList.add('done');
+    });
+    updateAll();
+  }
+
+  restoreState();
+</script>
+</body>
+</html>
