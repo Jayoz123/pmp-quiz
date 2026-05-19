@@ -1121,4 +1121,127 @@ Views.summary = {
         <div class="summary__actions">
           <button class="btn-secondary" onclick="App.navigate('home')">Wróć do menu</button>
           <button class="btn-primary" style="flex:1"
-                  onclick="Views.summary._re
+                  onclick="Views.summary._replay()">Zagraj ponownie</button>
+        </div>
+      </div>`;
+  },
+
+  init() {
+    const s = AppState.lastSummary;
+    if (!s) return;
+    setTimeout(() => {
+      const bar = document.querySelector('.summary__progress-bar');
+      if (bar) bar.style.width = bar.dataset.target + '%';
+    }, 100);
+    if (s.percent >= 80) setTimeout(launchConfetti, 300);
+    const newBadges = BadgeManager.checkAndUnlock();
+    if (newBadges.length) {
+      let delay = 800;
+      newBadges.forEach(b => { setTimeout(() => showBadgePopup(b), delay); delay += 2500; });
+    }
+  },
+
+  _replay() {
+    const mode = AppState.lastSummary?.mode;
+    if (mode === 'daily') App.navigate('daily-start');
+    else App.navigate('mode-select');
+  },
+};
+
+// ==================== STATS VIEW ====================
+Views.stats = {
+  render() {
+    const avg3  = StatsManager.getAvg(3);
+    const avg7  = StatsManager.getAvg(7);
+    const avg30 = StatsManager.getAvg(30);
+    const totals = StatsManager.getTotals();
+    const perDomain = StatsManager.getPerDomain(AppState.questions);
+    const unlocked = Storage.getUnlockedBadges();
+    const days = StreakManager.getLast30Days();
+
+    const avgVal = v => v !== null ? `${v}%` : '—';
+    const domainBars = perDomain.map(d => `
+      <div class="domain-bar">
+        <span class="domain-bar__name">${d.domain}</span>
+        <div class="domain-bar__track">
+          <div class="domain-bar__fill" style="width:0%" data-target="${d.percent ?? 0}"></div>
+        </div>
+        <span class="domain-bar__pct">${d.percent !== null ? d.percent + '%' : '—'}</span>
+      </div>`).join('');
+
+    const badgeItems = BADGES_DEF.map(b => `
+      <div class="badge-item ${unlocked.includes(b.id) ? '' : 'locked'}">
+        <div class="badge-item__emoji">${b.emoji}</div>
+        <div class="badge-item__name">${b.name}</div>
+      </div>`).join('');
+
+    const calDots = days.map(d =>
+      `<div class="streak-dot streak-dot--${d.status}" title="${d.date}"></div>`
+    ).join('');
+
+    return `
+      <div class="screen stats">
+        <button class="btn-back" onclick="App.navigate('home')">‹ Wróć</button>
+        <h1>Statystyki</h1>
+
+        <div class="stats-card">
+          <h3>Średnia poprawnych odpowiedzi</h3>
+          <div class="avg-row">
+            <div class="avg-item">
+              <div class="avg-item__val">${avgVal(avg3)}</div>
+              <div class="avg-item__label">3 dni</div>
+            </div>
+            <div class="avg-item">
+              <div class="avg-item__val">${avgVal(avg7)}</div>
+              <div class="avg-item__label">7 dni</div>
+            </div>
+            <div class="avg-item">
+              <div class="avg-item__val">${avgVal(avg30)}</div>
+              <div class="avg-item__label">30 dni</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-card">
+          <h3>Łącznie</h3>
+          <div class="totals">
+            <div class="total-item">
+              <div class="total-item__val">${totals.quizzes}</div>
+              <div class="total-item__label">Quizy</div>
+            </div>
+            <div class="total-item">
+              <div class="total-item__val">${totals.answered}</div>
+              <div class="total-item__label">Pytania</div>
+            </div>
+          </div>
+        </div>
+
+        ${perDomain.length ? `
+        <div class="stats-card">
+          <h3>Per domena</h3>
+          ${domainBars}
+        </div>` : ''}
+
+        <div class="stats-card">
+          <h3>Aktywność (30 dni)</h3>
+          <div class="streak-dots">${calDots}</div>
+        </div>
+
+        <div class="stats-card">
+          <h3>Odznaki</h3>
+          <div class="badges-grid">${badgeItems}</div>
+        </div>
+      </div>`;
+  },
+
+  init() {
+    setTimeout(() => {
+      document.querySelectorAll('.domain-bar__fill[data-target]').forEach(el => {
+        el.style.width = el.dataset.target + '%';
+      });
+    }, 100);
+  },
+};
+
+// ==================== BOOT ====================
+document.addEventListener('DOMContentLoaded', () => App.init());
