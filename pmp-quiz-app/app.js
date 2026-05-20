@@ -20,24 +20,137 @@ const SRS_COOLDOWN = 15; // min questions before re-showing the same weak questi
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
 const BADGES_DEF = [
-  { id: 'first',   emoji: '🎯', name: 'Pierwszy krok', desc: 'Ukończ pierwszy quiz',           check: s => s.totalQuizzes >= 1 },
-  { id: 'week',    emoji: '🔥', name: 'Tydzień ognia', desc: '7 dni serii z rzędu',             check: s => s.currentStreak >= 7 },
-  { id: 'month',   emoji: '💪', name: 'Miesiąc mocy',  desc: '30 dni serii z rzędu',            check: s => s.currentStreak >= 30 },
-  { id: 'hundred', emoji: '🧠', name: 'Setka',         desc: '100 odpowiedzianych pytań',       check: s => s.totalAnswered >= 100 },
-  { id: 'fivehun', emoji: '🏆', name: 'Pięćsetka',     desc: '500 odpowiedzianych pytań',       check: s => s.totalAnswered >= 500 },
-  { id: 'perfect', emoji: '⭐', name: 'Perfekcja',     desc: '100% poprawnych w jednym quizie', check: s => s.hadPerfectQuiz },
-  { id: 'ready',   emoji: '🎓', name: 'PMP Ready',     desc: 'Średnia ≥ 80% z 30 dni',          check: s => s.avg30 >= 80 },
+  { id: 'first',   emoji: '🎯', name: 'Pierwszy krok', name_en: 'First step',    desc: 'Ukończ pierwszy quiz',           desc_en: 'Complete your first quiz',        check: s => s.totalQuizzes >= 1 },
+  { id: 'week',    emoji: '🔥', name: 'Tydzień ognia', name_en: 'Week of fire',  desc: '7 dni serii z rzędu',             desc_en: '7-day streak in a row',           check: s => s.currentStreak >= 7 },
+  { id: 'month',   emoji: '💪', name: 'Miesiąc mocy',  name_en: 'Month of power', desc: '30 dni serii z rzędu',           desc_en: '30-day streak in a row',          check: s => s.currentStreak >= 30 },
+  { id: 'hundred', emoji: '🧠', name: 'Setka',         name_en: 'Century',       desc: '100 odpowiedzianych pytań',       desc_en: '100 questions answered',          check: s => s.totalAnswered >= 100 },
+  { id: 'fivehun', emoji: '🏆', name: 'Pięćsetka',     name_en: 'Five hundred',  desc: '500 odpowiedzianych pytań',       desc_en: '500 questions answered',          check: s => s.totalAnswered >= 500 },
+  { id: 'perfect', emoji: '⭐', name: 'Perfekcja',     name_en: 'Perfection',    desc: '100% poprawnych w jednym quizie', desc_en: '100% correct in a single quiz',   check: s => s.hadPerfectQuiz },
+  { id: 'ready',   emoji: '🎓', name: 'PMP Ready',     name_en: 'PMP Ready',     desc: 'Średnia ≥ 80% z 30 dni',          desc_en: 'Average ≥ 80% over 30 days',      check: s => s.avg30 >= 80 },
 ];
 
 const QUOTES = [
-  'Zarządzanie projektem to sztuka realizacji wizji w ramach ograniczeń.',
-  'Dobry plan teraz jest lepszy od doskonałego planu jutro.',
-  'Ryzyk nie ignorujemy — zarządzamy nimi.',
-  'Komunikacja to 90% zarządzania projektem.',
-  'Każdy projekt to szansa na naukę.',
-  'Sukces to zaplanowany wynik, nie przypadek.',
-  'Zarządzaj oczekiwaniami tak samo pilnie jak zakresem.',
+  { pl: 'Zarządzanie projektem to sztuka realizacji wizji w ramach ograniczeń.', en: 'Project management is the art of realizing a vision within constraints.' },
+  { pl: 'Dobry plan teraz jest lepszy od doskonałego planu jutro.',              en: 'A good plan now is better than a perfect plan tomorrow.' },
+  { pl: 'Ryzyk nie ignorujemy — zarządzamy nimi.',                               en: "We don't ignore risks — we manage them." },
+  { pl: 'Komunikacja to 90% zarządzania projektem.',                             en: 'Communication is 90% of project management.' },
+  { pl: 'Każdy projekt to szansa na naukę.',                                     en: 'Every project is a chance to learn.' },
+  { pl: 'Sukces to zaplanowany wynik, nie przypadek.',                           en: 'Success is a planned outcome, not an accident.' },
+  { pl: 'Zarządzaj oczekiwaniami tak samo pilnie jak zakresem.',                 en: 'Manage expectations as diligently as you manage scope.' },
 ];
+
+// ==================== I18N (UI language) ====================
+// Current UI language follows AppState.showEnglish (set from the saved language setting,
+// and toggled per-question by testers). 'en' => English UI, otherwise Polish.
+const L = () => (AppState.showEnglish ? 'en' : 'pl');
+
+// PL domain (as stored in questions.json) -> EN label
+const DOMAIN_I18N = {
+  'Harmonogram': 'Schedule', 'Integracja': 'Integration', 'Interesariusz': 'Stakeholder',
+  'Jakość': 'Quality', 'Komunikacja': 'Communications', 'Koszt': 'Cost', 'Ludzie': 'People',
+  'Nabywanie': 'Procurement', 'Ogólny': 'General', 'Proces': 'Process', 'Ryzyko': 'Risk',
+  'Zakres': 'Scope', 'Zasoby': 'Resource', 'Środowisko biznesowe': 'Business Environment',
+};
+const tDomain = d => (AppState.showEnglish ? (DOMAIN_I18N[d] || d) : d);
+
+const I18N = {
+  // login
+  login_subtitle:     { pl: 'Nauka do egzaminu PMP',            en: 'Study for the PMP exam' },
+  email_ph:           { pl: 'Adres email',                      en: 'Email address' },
+  pass_ph:            { pl: 'Hasło (min. 6 znaków)',            en: 'Password (min. 6 characters)' },
+  sign_up:            { pl: 'Zarejestruj się',                  en: 'Sign up' },
+  sign_in:            { pl: 'Zaloguj się',                      en: 'Sign in' },
+  have_account:       { pl: '← Mam już konto — zaloguj się',    en: '← I already have an account — sign in' },
+  no_account:         { pl: 'Nie mam konta — zarejestruj się →', en: "Don't have an account — sign up →" },
+  enter_credentials:  { pl: 'Podaj email i hasło.',             en: 'Enter your email and password.' },
+  check_email:        { pl: 'Sprawdź email i kliknij link potwierdzający, a potem wróć i zaloguj się.', en: 'Check your email and click the confirmation link, then come back and sign in.' },
+  generic_error:      { pl: 'Błąd — spróbuj ponownie.',         en: 'Error — please try again.' },
+  // home
+  settings:           { pl: 'Ustawienia',                       en: 'Settings' },
+  streak_start:       { pl: '⚡ Zacznij serię!',                en: '⚡ Start a streak!' },
+  streak_one:         { pl: '🔥 1 dzień z rzędu',               en: '🔥 1 day in a row' },
+  streak_many:        { pl: '🔥 {n} dni z rzędu',               en: '🔥 {n} days in a row' },
+  daily_challenge:    { pl: 'Codzienne Wyzwanie',               en: 'Daily Challenge' },
+  daily_done:         { pl: '30 pytań · Ukończono dziś ✓',      en: '30 questions · Done today ✓' },
+  daily_pending:      { pl: '30 pytań · Wymagane dziś',         en: '30 questions · Required today' },
+  quick_quiz:         { pl: 'Szybki Quiz',                      en: 'Quick Quiz' },
+  quick_quiz_sub:     { pl: '10 pytań · losowe',                en: '10 questions · random' },
+  statistics:         { pl: 'Statystyki',                       en: 'Statistics' },
+  your_progress:      { pl: 'Twój postęp',                      en: 'Your progress' },
+  // settings modal
+  close:              { pl: 'Zamknij',                          en: 'Close' },
+  confidence_label:   { pl: 'Ocena pewności',                   en: 'Confidence rating' },
+  confidence_desc:    { pl: 'Skala 1–3 przed odpowiedzią',      en: '1–3 scale before answering' },
+  confidence_aria:    { pl: 'Włącz ocenę pewności',             en: 'Enable confidence rating' },
+  app_language:       { pl: 'Język aplikacji',                  en: 'App language' },
+  app_language_desc:  { pl: 'Język całej aplikacji i pytań',    en: 'Language of the whole app and questions' },
+  sign_out:           { pl: 'Wyloguj się',                      en: 'Sign out' },
+  privacy_policy:     { pl: 'Polityka prywatności ↗',           en: 'Privacy policy ↗' },
+  sign_out_confirm:   { pl: 'Wylogować się?',                   en: 'Sign out?' },
+  // mode select
+  back:               { pl: '‹ Wróć',                           en: '‹ Back' },
+  standard_quiz:      { pl: '⚡ Standardowy Quiz',              en: '⚡ Standard Quiz' },
+  standard_quiz_desc: { pl: '10 losowych pytań z wybranych domen', en: '10 random questions from selected domains' },
+  filter_domains:     { pl: 'Filtruj domeny (domyślnie wszystkie):', en: 'Filter domains (all by default):' },
+  weak_questions:     { pl: '🎯 Moje słabe pytania',            en: '🎯 My weak questions' },
+  weak_locked:        { pl: 'Ukończ pierwszy quiz, żeby odblokować', en: 'Complete your first quiz to unlock' },
+  weak_none:          { pl: 'Nie masz jeszcze słabych pytań 🎉', en: "You don't have any weak questions yet 🎉" },
+  weak_count:         { pl: '{n} pytań do powtórki',            en: '{n} questions to review' },
+  start:              { pl: 'Start →',                          en: 'Start →' },
+  weak_alert:         { pl: 'Nie masz jeszcze słabych pytań. Ukończ więcej quizów!', en: "You don't have any weak questions yet. Complete more quizzes!" },
+  no_questions_filter:{ pl: 'Brak pytań dla wybranych filtrów. Zmień ustawienia.', en: 'No questions for the selected filters. Change the settings.' },
+  load_fail:          { pl: 'Nie udało się załadować pytań. Sprawdź połączenie i odśwież stronę.', en: 'Failed to load questions. Check your connection and refresh the page.' },
+  // quiz
+  back_to_menu:       { pl: 'Wróć do menu',                     en: 'Back to menu' },
+  report_title:       { pl: 'Zgłoś błąd w pytaniu',             en: 'Report an issue with this question' },
+  confidence_q:       { pl: 'Jak pewna/y byłaś/eś?',            en: 'How confident were you?' },
+  conf_guess:         { pl: '🎲 Zgadywałem/am',                 en: '🎲 I guessed' },
+  conf_unsure:        { pl: '🤔 Nie byłem/am pewny/a',          en: "🤔 I wasn't sure" },
+  conf_knew:          { pl: '✅ Wiedziałem/am!',                en: '✅ I knew it!' },
+  verdict_correct:    { pl: '✅ Poprawnie!',                    en: '✅ Correct!' },
+  verdict_wrong:      { pl: '❌ Błędna odpowiedź',              en: '❌ Wrong answer' },
+  next:               { pl: 'Dalej →',                          en: 'Next →' },
+  // report modal
+  report_aria:        { pl: 'Zgłoś błąd',                       en: 'Report an issue' },
+  report_header:      { pl: '🚩 Zgłoś błąd w pytaniu',          en: '🚩 Report an issue with this question' },
+  cat_wrong_answer:   { pl: '❌ Błędna poprawna odpowiedź',     en: '❌ Wrong correct answer' },
+  cat_unclear:        { pl: '❓ Niejasne pytanie',              en: '❓ Unclear question' },
+  cat_typo:           { pl: '✏️ Literówka / błąd w treści',     en: '✏️ Typo / error in text' },
+  cat_translation:    { pl: '🌐 Błąd w tłumaczeniu (EN/PL)',    en: '🌐 Translation error (EN/PL)' },
+  cat_other:          { pl: '💬 Inne',                          en: '💬 Other' },
+  report_comment_ph:  { pl: 'Opcjonalnie: opisz dokładniej co jest nie tak…', en: 'Optionally: describe in more detail what is wrong…' },
+  cancel:             { pl: 'Anuluj',                           en: 'Cancel' },
+  send_report:        { pl: 'Wyślij zgłoszenie',               en: 'Send report' },
+  report_sent:        { pl: '✅ Zgłoszenie wysłane — dziękujemy!', en: '✅ Report sent — thank you!' },
+  report_send_err:    { pl: 'Błąd wysyłania — spróbuj ponownie.', en: 'Send error — please try again.' },
+  // badge popup
+  badge_unlocked:     { pl: 'Odznaka odblokowana!',             en: 'Badge unlocked!' },
+  // summary
+  quiz_complete:      { pl: 'Quiz ukończony!',                  en: 'Quiz complete!' },
+  streak_extended:    { pl: '🔥 Seria przedłużona!',            en: '🔥 Streak extended!' },
+  best_streak:        { pl: 'Najlepsza seria:',                 en: 'Best streak:' },
+  in_a_row:           { pl: '{n} pod rząd',                     en: '{n} in a row' },
+  weakest_domain:     { pl: 'Najsłabsza domena:',               en: 'Weakest domain:' },
+  play_again:         { pl: 'Zagraj ponownie',                  en: 'Play again' },
+  // stats
+  avg_correct:        { pl: 'Średnia poprawnych odpowiedzi',    en: 'Average correct answers' },
+  d3:                 { pl: '3 dni',                            en: '3 days' },
+  d7:                 { pl: '7 dni',                            en: '7 days' },
+  d30:                { pl: '30 dni',                           en: '30 days' },
+  total:              { pl: 'Łącznie',                          en: 'Total' },
+  quizzes:            { pl: 'Quizy',                            en: 'Quizzes' },
+  questions:          { pl: 'Pytania',                          en: 'Questions' },
+  per_domain:         { pl: 'Per domena',                       en: 'Per domain' },
+  activity_30:        { pl: 'Aktywność (30 dni)',               en: 'Activity (30 days)' },
+  badges:             { pl: 'Odznaki',                          en: 'Badges' },
+};
+
+function t(key, vars) {
+  const entry = I18N[key];
+  let s = entry ? (entry[L()] ?? entry.pl) : key;
+  if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+  return s;
+}
 
 // ==================== STORAGE (localStorage cache) ====================
 const Storage = {
@@ -378,11 +491,14 @@ const App = {
   render() {
     const view = Views[this.currentView];
     if (!view) { console.error('Unknown view:', this.currentView); return; }
+    document.documentElement.lang = L();
     document.getElementById('app').innerHTML = view.render();
     view.init?.();
   },
 
   async init() {
+    // Apply saved language before the first paint so the loading/login screens are localized too
+    AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
     this.navigate('loading');
     const { data: { session } } = await sb().auth.getSession();
     if (!session) {
@@ -420,19 +536,19 @@ Views.login = {
       <div class="screen login-screen">
         <div class="login-logo">📋</div>
         <h1 class="login-title">PMP Quiz</h1>
-        <p class="login-subtitle">Nauka do egzaminu PMP</p>
+        <p class="login-subtitle">${t('login_subtitle')}</p>
         <div class="login-form">
-          <input type="email" id="l-email" placeholder="Adres email"
+          <input type="email" id="l-email" placeholder="${t('email_ph')}"
                  autocomplete="email" inputmode="email" />
           <input type="password" id="l-pass"
-                 placeholder="Hasło (min. 6 znaków)"
+                 placeholder="${t('pass_ph')}"
                  autocomplete="${isReg ? 'new-password' : 'current-password'}" />
           <div id="l-msg" class="login-msg hidden"></div>
           <button class="btn-primary" id="l-submit" onclick="Views.login._submit()">
-            ${isReg ? 'Zarejestruj się' : 'Zaloguj się'}
+            ${isReg ? t('sign_up') : t('sign_in')}
           </button>
           <button class="btn-link" onclick="Views.login._toggle()">
-            ${isReg ? '← Mam już konto — zaloguj się' : 'Nie mam konta — zarejestruj się →'}
+            ${isReg ? t('have_account') : t('no_account')}
           </button>
         </div>
       </div>`;
@@ -448,7 +564,7 @@ Views.login = {
     const pass  = document.getElementById('l-pass')?.value;
     const btn   = document.getElementById('l-submit');
 
-    if (!email || !pass) { this._msg('Podaj email i hasło.', false); return; }
+    if (!email || !pass) { this._msg(t('enter_credentials'), false); return; }
 
     btn.disabled    = true;
     btn.textContent = '…';
@@ -456,18 +572,18 @@ Views.login = {
     try {
       if (this._mode === 'register') {
         await Auth.signUp(email, pass);
-        this._msg('Sprawdź email i kliknij link potwierdzający, a potem wróć i zaloguj się.', true);
+        this._msg(t('check_email'), true);
         this._mode      = 'login';
         btn.disabled    = false;
-        btn.textContent = 'Zaloguj się';
+        btn.textContent = t('sign_in');
       } else {
         await Auth.signIn(email, pass);
         await App.afterAuth();
       }
     } catch (e) {
-      this._msg(e.message || 'Błąd — spróbuj ponownie.', false);
+      this._msg(e.message || t('generic_error'), false);
       btn.disabled    = false;
-      btn.textContent = this._mode === 'register' ? 'Zarejestruj się' : 'Zaloguj się';
+      btn.textContent = this._mode === 'register' ? t('sign_up') : t('sign_in');
     }
   },
 
@@ -484,7 +600,8 @@ Views.login = {
 // ==================== LOADING VIEW ====================
 Views.loading = {
   render() {
-    const quote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    const quote = q[L()] ?? q.pl;
     return `
       <div class="loading-screen">
         <div class="loading-logo">📋</div>
@@ -505,14 +622,14 @@ Views.home = {
     const dots       = days.map(d =>
       `<div class="streak-dot streak-dot--${d.status}" title="${d.date}"></div>`
     ).join('');
-    const streakLabel = streak === 0 ? '⚡ Zacznij serię!'
-      : streak === 1 ? '🔥 1 dzień z rzędu'
-      : `🔥 ${streak} dni z rzędu`;
+    const streakLabel = streak === 0 ? t('streak_start')
+      : streak === 1 ? t('streak_one')
+      : t('streak_many', { n: streak });
 
     return `
       <div class="screen home">
         <div class="home-topbar">
-          <button class="btn-settings" onclick="Views.home._openSettings()" title="Ustawienia">⚙️</button>
+          <button class="btn-settings" onclick="Views.home._openSettings()" title="${t('settings')}">⚙️</button>
         </div>
         <div id="pwa-install-banner"></div>
         <div class="streak-widget">
@@ -524,24 +641,24 @@ Views.home = {
                   onclick="App.navigate('daily-start')">
             <span class="menu-btn__icon">${dailyDone ? '✅' : '🔴'}</span>
             <div class="menu-btn__content">
-              <div class="menu-btn__title">Codzienne Wyzwanie</div>
-              <div class="menu-btn__sub">30 pytań · ${dailyDone ? 'Ukończono dziś ✓' : 'Wymagane dziś'}</div>
+              <div class="menu-btn__title">${t('daily_challenge')}</div>
+              <div class="menu-btn__sub">${dailyDone ? t('daily_done') : t('daily_pending')}</div>
             </div>
             <span class="menu-btn__arrow">›</span>
           </button>
           <button class="menu-btn" onclick="App.navigate('mode-select')">
             <span class="menu-btn__icon">⚡</span>
             <div class="menu-btn__content">
-              <div class="menu-btn__title">Szybki Quiz</div>
-              <div class="menu-btn__sub">10 pytań · losowe</div>
+              <div class="menu-btn__title">${t('quick_quiz')}</div>
+              <div class="menu-btn__sub">${t('quick_quiz_sub')}</div>
             </div>
             <span class="menu-btn__arrow">›</span>
           </button>
           <button class="menu-btn" onclick="App.navigate('stats')">
             <span class="menu-btn__icon">📊</span>
             <div class="menu-btn__content">
-              <div class="menu-btn__title">Statystyki</div>
-              <div class="menu-btn__sub">Twój postęp</div>
+              <div class="menu-btn__title">${t('statistics')}</div>
+              <div class="menu-btn__sub">${t('your_progress')}</div>
             </div>
             <span class="menu-btn__arrow">›</span>
           </button>
@@ -555,20 +672,20 @@ Views.home = {
     el.id = 'settings-modal';
     el.className = 'settings-modal';
     el.innerHTML = `
-      <div class="settings-modal__card" role="dialog" aria-modal="true" aria-label="Ustawienia">
+      <div class="settings-modal__card" role="dialog" aria-modal="true" aria-label="${t('settings')}">
         <div class="settings-modal__header">
-          <span>Ustawienia</span>
-          <button class="settings-modal__close" onclick="Views.home._closeSettings()" aria-label="Zamknij">✕</button>
+          <span>${t('settings')}</span>
+          <button class="settings-modal__close" onclick="Views.home._closeSettings()" aria-label="${t('close')}">✕</button>
         </div>
         <div class="settings-row">
           <div class="settings-row__info">
             <span class="settings-row__icon">🧠</span>
             <div>
-              <div class="settings-row__label">Ocena pewności</div>
-              <div class="settings-row__desc">Skala 1–3 przed odpowiedzią</div>
+              <div class="settings-row__label">${t('confidence_label')}</div>
+              <div class="settings-row__desc">${t('confidence_desc')}</div>
             </div>
           </div>
-          <label class="settings-toggle" aria-label="Włącz ocenę pewności">
+          <label class="settings-toggle" aria-label="${t('confidence_aria')}">
             <input type="checkbox" id="confidence-toggle"
                    ${settings.confidenceEnabled ? 'checked' : ''}
                    onchange="Views.home._toggleConfidence(this.checked)">
@@ -580,8 +697,8 @@ Views.home = {
           <div class="settings-row__info">
             <span class="settings-row__icon">🌐</span>
             <div>
-              <div class="settings-row__label">Język pytań</div>
-              <div class="settings-row__desc">Domyślny język treści quizu</div>
+              <div class="settings-row__label">${t('app_language')}</div>
+              <div class="settings-row__desc">${t('app_language_desc')}</div>
             </div>
           </div>
           <div class="settings-lang-select">
@@ -593,9 +710,9 @@ Views.home = {
         </div>
         <div class="settings-separator"></div>
         <button class="settings-action-btn settings-action-btn--danger"
-                onclick="Views.home._logout()">Wyloguj się</button>
+                onclick="Views.home._logout()">${t('sign_out')}</button>
         <a class="settings-action-btn settings-action-btn--link"
-           href="#" target="_blank" rel="noopener noreferrer">Polityka prywatności ↗</a>
+           href="#" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) Views.home._closeSettings(); });
@@ -617,14 +734,16 @@ Views.home = {
     Storage.saveSettings(s);
     // Keep the live EN/PL state in sync with the new global preference
     AppState.showEnglish = (lang === 'en');
-    // Re-render the modal so the active button reflects the change
+    // Re-render the whole view behind the modal (so the entire UI switches language),
+    // then reopen the modal so its labels + active button reflect the change
     Views.home._closeSettings();
+    App.render();
     Views.home._openSettings();
   },
 
   async _logout() {
     Views.home._closeSettings();
-    if (!confirm('Wylogować się?')) return;
+    if (!confirm(t('sign_out_confirm'))) return;
     await Auth.signOut();
     App.navigate('login');
   },
@@ -650,35 +769,35 @@ Views['mode-select'] = {
     const domainChips = domains.map(d => {
       const sel = self._selectedDomains.includes(d);
       return `<div class="domain-chip ${sel ? 'selected' : ''}"
-                   onclick="Views['mode-select']._toggleDomain('${d}')">${d}</div>`;
+                   onclick="Views['mode-select']._toggleDomain('${d}')">${tDomain(d)}</div>`;
     }).join('');
 
     let weakSubtitle;
-    if (neverPlayed)      weakSubtitle = 'Ukończ pierwszy quiz, żeby odblokować';
-    else if (weakCount === 0) weakSubtitle = 'Nie masz jeszcze słabych pytań 🎉';
-    else                  weakSubtitle = `${weakCount} pytań do powtórki`;
+    if (neverPlayed)      weakSubtitle = t('weak_locked');
+    else if (weakCount === 0) weakSubtitle = t('weak_none');
+    else                  weakSubtitle = t('weak_count', { n: weakCount });
 
     return `
       <div class="screen mode-select">
-        <button class="btn-back" onclick="App.navigate('home')">‹ Wróć</button>
-        <h2>Szybki Quiz</h2>
+        <button class="btn-back" onclick="App.navigate('home')">${t('back')}</button>
+        <h2>${t('quick_quiz')}</h2>
         <div class="mode-card ${self._selectedMode === 'quick' ? 'selected' : ''}"
              onclick="Views['mode-select']._selectMode('quick')">
-          <h3>⚡ Standardowy Quiz</h3>
-          <p>10 losowych pytań z wybranych domen</p>
+          <h3>${t('standard_quiz')}</h3>
+          <p>${t('standard_quiz_desc')}</p>
           <div class="domain-filter" style="margin-top:12px">
-            <label>Filtruj domeny (domyślnie wszystkie):</label>
+            <label>${t('filter_domains')}</label>
             <div class="domain-chips">${domainChips}</div>
           </div>
         </div>
         <div class="mode-card ${self._selectedMode === 'weak' ? 'selected' : ''} ${weakDisabled ? 'disabled' : ''}"
              ${weakDisabled ? '' : "onclick=\"Views['mode-select']._selectMode('weak')\""}>
-          <h3>🎯 Moje słabe pytania</h3>
+          <h3>${t('weak_questions')}</h3>
           <p>${weakSubtitle}</p>
         </div>
         <button class="btn-primary" style="margin-top:8px"
                 onclick="Views['mode-select']._startQuiz()">
-          Start →
+          ${t('start')}
         </button>
       </div>`;
   },
@@ -697,7 +816,7 @@ Views['mode-select'] = {
 
   _startQuiz() {
     if (this._selectedMode === 'weak' && QuizEngine.countWeakQuestions(AppState.questions) === 0) {
-      alert('Nie masz jeszcze słabych pytań. Ukończ więcej quizów!');
+      alert(t('weak_alert'));
       return;
     }
     const recentlyShown = AppState.quizSession?.recentlyShown || [];
@@ -705,7 +824,7 @@ Views['mode-select'] = {
       AppState.questions, this._selectedMode, this._selectedDomains, recentlyShown
     );
     if (!questions.length) {
-      alert('Brak pytań dla wybranych filtrów. Zmień ustawienia.');
+      alert(t('no_questions_filter'));
       return;
     }
     AppState.quizSession    = { questions, current: 0, answers: [], mode: this._selectedMode, shuffledMap: {}, recentlyShown: [] };
@@ -728,7 +847,7 @@ Views['daily-start'] = {
       return;
     }
     if (!AppState.questions.length) {
-      alert('Nie udało się załadować pytań. Sprawdź połączenie i odśwież stronę.');
+      alert(t('load_fail'));
       App.navigate('home');
       return;
     }
@@ -765,19 +884,21 @@ Views.quiz = {
         <span>${text}</span>
       </button>`).join('');
 
-    // Toggle EN/PL — per-question override, only for testers (regular users use the global setting)
+    // Toggle EN/PL — per-question override, only for testers (regular users use the global setting).
+    // Shows the flag of the language you'd switch TO.
     const langToggle = (hasEn && AppState.isTester) ? `
-      <button class="btn-lang-toggle" onclick="Views.quiz._toggleLang()">
-        ${showEn ? '🇵🇱 Pokaż PL' : '🇬🇧 Pokaż EN'}
+      <button class="btn-lang-toggle" onclick="Views.quiz._toggleLang()"
+              title="${showEn ? 'PL' : 'EN'}" aria-label="${showEn ? 'PL' : 'EN'}">
+        ${showEn ? '🇵🇱' : '🇬🇧'}
       </button>` : '';
 
     return `
       <div class="screen quiz">
         <div class="quiz-header">
-          <button class="quiz-abandon" onclick="Views.quiz._abandon()" title="Wróć do menu">✕</button>
+          <button class="quiz-abandon" onclick="Views.quiz._abandon()" title="${t('back_to_menu')}">✕</button>
           <span class="quiz-counter">${session.current + 1} / ${total}</span>
-          ${q.domain ? `<span class="quiz-domain">${q.domain}</span>` : ''}
-          <button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="Zgłoś błąd w pytaniu">🚩</button>
+          ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
+          <button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>
         </div>
         <div class="quiz-progress">
           <div class="quiz-progress__bar" style="width:${pct}%"></div>
@@ -814,18 +935,18 @@ Views.quiz = {
     backdrop.className = 'confidence-backdrop';
     backdrop.innerHTML = `
       <div class="confidence-sheet" id="confidence-sheet">
-        <p class="confidence-sheet__title">Jak pewna/y byłaś/eś?</p>
+        <p class="confidence-sheet__title">${t('confidence_q')}</p>
         <button class="confidence-btn"
                 onclick="Views.quiz._pickConfidence(1, ${selectedIndex})">
-          🎲 Zgadywałem/am
+          ${t('conf_guess')}
         </button>
         <button class="confidence-btn"
                 onclick="Views.quiz._pickConfidence(2, ${selectedIndex})">
-          🤔 Nie byłem/am pewny/a
+          ${t('conf_unsure')}
         </button>
         <button class="confidence-btn"
                 onclick="Views.quiz._pickConfidence(3, ${selectedIndex})">
-          ✅ Wiedziałem/am!
+          ${t('conf_knew')}
         </button>
       </div>`;
     // Tap outside backdrop = skip confidence (null, no SRS penalty)
@@ -881,19 +1002,20 @@ Views.quiz = {
     const explanationLangBtn = (hasEn && AppState.isTester) ? `
       <button class="btn-sm btn-lang-sm"
               onclick="Views.quiz._toggleExplLang(this, ${session.current})"
-              data-showing="${showEn ? 'en' : 'pl'}">
-        ${showEn ? '🇵🇱 PL' : '🇬🇧 EN'}
+              data-showing="${showEn ? 'en' : 'pl'}"
+              title="${showEn ? 'PL' : 'EN'}" aria-label="${showEn ? 'PL' : 'EN'}">
+        ${showEn ? '🇵🇱' : '🇬🇧'}
       </button>` : '';
 
     panel.innerHTML = `
       <div class="explanation-panel ${isCorrect ? 'explanation-panel--correct' : 'explanation-panel--wrong'}">
         <div class="explanation-header">
-          <span class="explanation-verdict">${isCorrect ? '✅ Poprawnie!' : '❌ Błędna odpowiedź'}</span>
+          <span class="explanation-verdict">${isCorrect ? t('verdict_correct') : t('verdict_wrong')}</span>
           ${explanationLangBtn}
         </div>
         <p class="explanation-text" id="expl-text">${explanationText}</p>
       </div>
-      <button class="btn-next" onclick="Views.quiz._advance()">Dalej →</button>`;
+      <button class="btn-next" onclick="Views.quiz._advance()">${t('next')}</button>`;
   },
 
   _toggleExplLang(btn, qIdx) {
@@ -908,7 +1030,10 @@ Views.quiz = {
         : q.explanation;
     }
     btn.dataset.showing = newShowing;
-    btn.textContent = newShowing === 'en' ? '🇵🇱 PL' : '🇬🇧 EN';
+    // Show the flag of the language you'd switch TO next
+    btn.textContent = newShowing === 'en' ? '🇵🇱' : '🇬🇧';
+    btn.title = newShowing === 'en' ? 'PL' : 'EN';
+    btn.setAttribute('aria-label', newShowing === 'en' ? 'PL' : 'EN');
   },
 
   // ---- Zgłaszanie błędów ----
@@ -921,11 +1046,11 @@ Views.quiz = {
     document.getElementById('report-modal')?.remove();
 
     const categories = [
-      { id: 'wrong_answer',  label: '❌ Błędna poprawna odpowiedź' },
-      { id: 'unclear',       label: '❓ Niejasne pytanie' },
-      { id: 'typo',          label: '✏️ Literówka / błąd w treści' },
-      { id: 'translation',   label: '🌐 Błąd w tłumaczeniu (EN/PL)' },
-      { id: 'other',         label: '💬 Inne' },
+      { id: 'wrong_answer',  label: t('cat_wrong_answer') },
+      { id: 'unclear',       label: t('cat_unclear') },
+      { id: 'typo',          label: t('cat_typo') },
+      { id: 'translation',   label: t('cat_translation') },
+      { id: 'other',         label: t('cat_other') },
     ];
 
     const chips = categories.map(c => `
@@ -938,21 +1063,21 @@ Views.quiz = {
     modal.id = 'report-modal';
     modal.className = 'report-modal';
     modal.innerHTML = `
-      <div class="report-modal__card" role="dialog" aria-modal="true" aria-label="Zgłoś błąd">
+      <div class="report-modal__card" role="dialog" aria-modal="true" aria-label="${t('report_aria')}">
         <div class="report-modal__header">
-          <span>🚩 Zgłoś błąd w pytaniu</span>
-          <button class="report-modal__close" onclick="Views.quiz._closeReportModal()" aria-label="Zamknij">✕</button>
+          <span>${t('report_header')}</span>
+          <button class="report-modal__close" onclick="Views.quiz._closeReportModal()" aria-label="${t('close')}">✕</button>
         </div>
-        <p class="report-modal__question-preview">"${q.question.slice(0, 100)}${q.question.length > 100 ? '…' : ''}"</p>
+        <p class="report-modal__question-preview">"${(() => { const txt = (AppState.showEnglish && q.question_en) ? q.question_en : q.question; return txt.slice(0, 100) + (txt.length > 100 ? '…' : ''); })()}"</p>
         <div class="report-modal__cats" id="report-cats">${chips}</div>
         <textarea id="report-comment" class="report-modal__textarea"
-                  placeholder="Opcjonalnie: opisz dokładniej co jest nie tak…"
+                  placeholder="${t('report_comment_ph')}"
                   maxlength="500" rows="3"></textarea>
         <div id="report-modal-msg" class="report-modal__msg hidden"></div>
         <div class="report-modal__actions">
-          <button class="btn-secondary" onclick="Views.quiz._closeReportModal()">Anuluj</button>
+          <button class="btn-secondary" onclick="Views.quiz._closeReportModal()">${t('cancel')}</button>
           <button class="btn-primary" id="report-submit-btn"
-                  onclick="Views.quiz._submitReport()" disabled>Wyślij zgłoszenie</button>
+                  onclick="Views.quiz._submitReport()" disabled>${t('send_report')}</button>
         </div>
       </div>`;
 
@@ -995,14 +1120,14 @@ Views.quiz = {
         comment,
       });
       this._closeReportModal();
-      Views.quiz._showToast('✅ Zgłoszenie wysłane — dziękujemy!', true);
+      Views.quiz._showToast(t('report_sent'), true);
     } catch (e) {
       if (msgEl) {
-        msgEl.textContent = 'Błąd wysyłania — spróbuj ponownie.';
+        msgEl.textContent = t('report_send_err');
         msgEl.className   = 'report-modal__msg report-modal__msg--err';
       }
       submitBtn.disabled    = false;
-      submitBtn.textContent = 'Wyślij zgłoszenie';
+      submitBtn.textContent = t('send_report');
     }
   },
 
@@ -1121,11 +1246,13 @@ function launchConfetti() {
 function showBadgePopup(badge) {
   const popup = document.getElementById('badge-popup');
   popup.classList.remove('hidden');
+  const bName = AppState.showEnglish ? (badge.name_en || badge.name) : badge.name;
+  const bDesc = AppState.showEnglish ? (badge.desc_en || badge.desc) : badge.desc;
   popup.innerHTML = `
     <div class="badge-popup__emoji">${badge.emoji}</div>
     <div class="badge-popup__text">
-      <strong>Odznaka odblokowana!</strong>
-      <span>${badge.name} — ${badge.desc}</span>
+      <strong>${t('badge_unlocked')}</strong>
+      <span>${bName} — ${bDesc}</span>
     </div>`;
   popup.classList.add('visible');
   setTimeout(() => {
@@ -1143,8 +1270,8 @@ Views.summary = {
     const emoji    = s.percent >= 80 ? '🎉' : s.percent >= 60 ? '👍' : '💪';
     return `
       <div class="screen summary">
-        <div class="summary__title">${emoji} Quiz ukończony!</div>
-        ${s.streakExtended ? '<div class="summary__streak-msg">🔥 Seria przedłużona!</div>' : ''}
+        <div class="summary__title">${emoji} ${t('quiz_complete')}</div>
+        ${s.streakExtended ? `<div class="summary__streak-msg">${t('streak_extended')}</div>` : ''}
         <div class="summary__score-circle">
           <div class="summary__score-num">${s.correct}/${s.total}</div>
           <div class="summary__score-pct">${s.percent}%</div>
@@ -1156,19 +1283,19 @@ Views.summary = {
         </div>
         <div class="summary__details">
           <div class="summary__detail">
-            <span>Najlepsza seria:</span>
-            <span>${s.bestStreak} pod rząd</span>
+            <span>${t('best_streak')}</span>
+            <span>${t('in_a_row', { n: s.bestStreak })}</span>
           </div>
           ${s.weakestDomain ? `
           <div class="summary__detail">
-            <span>Najsłabsza domena:</span>
-            <span>${s.weakestDomain}</span>
+            <span>${t('weakest_domain')}</span>
+            <span>${tDomain(s.weakestDomain)}</span>
           </div>` : ''}
         </div>
         <div class="summary__actions">
-          <button class="btn-secondary" onclick="App.navigate('home')">Wróć do menu</button>
+          <button class="btn-secondary" onclick="App.navigate('home')">${t('back_to_menu')}</button>
           <button class="btn-primary" style="flex:1"
-                  onclick="Views.summary._replay()">Zagraj ponownie</button>
+                  onclick="Views.summary._replay()">${t('play_again')}</button>
         </div>
       </div>`;
   },
@@ -1209,7 +1336,7 @@ Views.stats = {
     const avgVal = v => v !== null ? `${v}%` : '—';
     const domainBars = perDomain.map(d => `
       <div class="domain-bar">
-        <span class="domain-bar__name">${d.domain}</span>
+        <span class="domain-bar__name">${tDomain(d.domain)}</span>
         <div class="domain-bar__track">
           <div class="domain-bar__fill" style="width:0%" data-target="${d.percent ?? 0}"></div>
         </div>
@@ -1219,7 +1346,7 @@ Views.stats = {
     const badgeItems = BADGES_DEF.map(b => `
       <div class="badge-item ${unlocked.includes(b.id) ? '' : 'locked'}">
         <div class="badge-item__emoji">${b.emoji}</div>
-        <div class="badge-item__name">${b.name}</div>
+        <div class="badge-item__name">${AppState.showEnglish ? (b.name_en || b.name) : b.name}</div>
       </div>`).join('');
 
     const calDots = days.map(d =>
@@ -1228,54 +1355,54 @@ Views.stats = {
 
     return `
       <div class="screen stats">
-        <button class="btn-back" onclick="App.navigate('home')">‹ Wróć</button>
-        <h1>Statystyki</h1>
+        <button class="btn-back" onclick="App.navigate('home')">${t('back')}</button>
+        <h1>${t('statistics')}</h1>
 
         <div class="stats-card">
-          <h3>Średnia poprawnych odpowiedzi</h3>
+          <h3>${t('avg_correct')}</h3>
           <div class="avg-row">
             <div class="avg-item">
               <div class="avg-item__val">${avgVal(avg3)}</div>
-              <div class="avg-item__label">3 dni</div>
+              <div class="avg-item__label">${t('d3')}</div>
             </div>
             <div class="avg-item">
               <div class="avg-item__val">${avgVal(avg7)}</div>
-              <div class="avg-item__label">7 dni</div>
+              <div class="avg-item__label">${t('d7')}</div>
             </div>
             <div class="avg-item">
               <div class="avg-item__val">${avgVal(avg30)}</div>
-              <div class="avg-item__label">30 dni</div>
+              <div class="avg-item__label">${t('d30')}</div>
             </div>
           </div>
         </div>
 
         <div class="stats-card">
-          <h3>Łącznie</h3>
+          <h3>${t('total')}</h3>
           <div class="totals">
             <div class="total-item">
               <div class="total-item__val">${totals.quizzes}</div>
-              <div class="total-item__label">Quizy</div>
+              <div class="total-item__label">${t('quizzes')}</div>
             </div>
             <div class="total-item">
               <div class="total-item__val">${totals.answered}</div>
-              <div class="total-item__label">Pytania</div>
+              <div class="total-item__label">${t('questions')}</div>
             </div>
           </div>
         </div>
 
         ${perDomain.length ? `
         <div class="stats-card">
-          <h3>Per domena</h3>
+          <h3>${t('per_domain')}</h3>
           ${domainBars}
         </div>` : ''}
 
         <div class="stats-card">
-          <h3>Aktywność (30 dni)</h3>
+          <h3>${t('activity_30')}</h3>
           <div class="streak-dots">${calDots}</div>
         </div>
 
         <div class="stats-card">
-          <h3>Odznaki</h3>
+          <h3>${t('badges')}</h3>
           <div class="badges-grid">${badgeItems}</div>
         </div>
       </div>`;
