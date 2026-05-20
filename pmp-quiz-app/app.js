@@ -2,7 +2,7 @@
 
 // ==================== VERSION ====================
 // Bump this string on every deploy to invalidate the Service Worker cache
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';

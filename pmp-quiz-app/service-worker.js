@@ -2,7 +2,7 @@
 
 // FIX #3 — wersjonowanie cache: zmień APP_VERSION przy każdym deployu
 // Musi być zsynchronizowane z APP_VERSION w app.js
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.3.0';
 const CACHE_NAME  = `pmp-quiz-${APP_VERSION}`;
 
 const ASSETS = [
