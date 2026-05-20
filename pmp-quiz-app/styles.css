@@ -707,6 +707,30 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .settings-row__desc  { font-size: 0.78rem; color: var(--text2); margin-top: 2px; }
 .settings-separator  { height: 1px; background: var(--border); margin: 14px 0; }
 
+/* Language switch (PL/EN) inside settings */
+.settings-lang-select {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.btn-lang-opt {
+  padding: 5px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-lang-opt.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
 /* Toggle switch */
 .settings-toggle {
   position: relative;

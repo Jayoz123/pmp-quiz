@@ -56,7 +56,7 @@ const Storage = {
   saveWeakQuestions(wq) { this._set('weak_questions', wq); },
   getUnlockedBadges()   { return this._get('unlocked_badges', []); },
   saveUnlockedBadges(b) { this._set('unlocked_badges', b); },
-  getSettings()         { return this._get('settings', { confidenceEnabled: true }); },
+  getSettings()         { return this._get('settings', { confidenceEnabled: true, defaultLanguage: 'pl' }); },
   saveSettings(s)       { this._set('settings', s); },
   getConfidenceData()   { return this._get('confidence_data', {}); },
   saveConfidenceData(d) { this._set('confidence_data', d); },
@@ -96,6 +96,22 @@ const SupabaseSync = {
         Storage.saveWeakQuestions(merged);
       }
     } catch (e) { console.warn('pullProgress failed:', e); }
+  },
+
+  // Loads the tester flag in an isolated query so a missing `is_tester`
+  // column never breaks the main progress sync. Defaults to false on any error.
+  async pullTesterFlag() {
+    try {
+      const { data: { user } } = await sb().auth.getUser();
+      if (!user) return;
+      const { data, error } = await sb()
+        .from('user_progress')
+        .select('is_tester')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) return;
+      AppState.isTester = data?.is_tester ?? false;
+    } catch (e) { console.warn('pullTesterFlag failed:', e); }
   },
 
   async pushProgress() {
@@ -342,6 +358,7 @@ const AppState = {
   pendingMode:  null,
   pendingDomains: [],
   showEnglish:  false,  // EN/PL toggle state
+  isTester:     false,  // gates per-question EN/PL override (set from Supabase user_progress.is_tester)
 };
 
 // ==================== VIEWS ====================
@@ -383,8 +400,11 @@ const App = {
       console.error('Failed to load questions.json', e);
       AppState.questions = [];
     }
-    // Pull cloud progress in background — does not block UI
+    // Pull cloud progress + tester flag in background — does not block UI
     SupabaseSync.pullProgress().catch(console.error);
+    SupabaseSync.pullTesterFlag().catch(console.error);
+    // Initialize EN/PL state from saved global language preference
+    AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
     await new Promise(r => setTimeout(r, 800));
     this.navigate('home');
   },
@@ -556,6 +576,22 @@ Views.home = {
           </label>
         </div>
         <div class="settings-separator"></div>
+        <div class="settings-row">
+          <div class="settings-row__info">
+            <span class="settings-row__icon">🌐</span>
+            <div>
+              <div class="settings-row__label">Język pytań</div>
+              <div class="settings-row__desc">Domyślny język treści quizu</div>
+            </div>
+          </div>
+          <div class="settings-lang-select">
+            <button class="btn-lang-opt ${settings.defaultLanguage === 'en' ? '' : 'active'}"
+                    onclick="Views.home._setLang('pl')">🇵🇱 PL</button>
+            <button class="btn-lang-opt ${settings.defaultLanguage === 'en' ? 'active' : ''}"
+                    onclick="Views.home._setLang('en')">🇬🇧 EN</button>
+          </div>
+        </div>
+        <div class="settings-separator"></div>
         <button class="settings-action-btn settings-action-btn--danger"
                 onclick="Views.home._logout()">Wyloguj się</button>
         <a class="settings-action-btn settings-action-btn--link"
@@ -573,6 +609,17 @@ Views.home = {
     const s = Storage.getSettings();
     s.confidenceEnabled = enabled;
     Storage.saveSettings(s);
+  },
+
+  _setLang(lang) {
+    const s = Storage.getSettings();
+    s.defaultLanguage = lang;
+    Storage.saveSettings(s);
+    // Keep the live EN/PL state in sync with the new global preference
+    AppState.showEnglish = (lang === 'en');
+    // Re-render the modal so the active button reflects the change
+    Views.home._closeSettings();
+    Views.home._openSettings();
   },
 
   async _logout() {
@@ -718,8 +765,8 @@ Views.quiz = {
         <span>${text}</span>
       </button>`).join('');
 
-    // Toggle EN/PL — shown only when question has EN translation
-    const langToggle = hasEn ? `
+    // Toggle EN/PL — per-question override, only for testers (regular users use the global setting)
+    const langToggle = (hasEn && AppState.isTester) ? `
       <button class="btn-lang-toggle" onclick="Views.quiz._toggleLang()">
         ${showEn ? '🇵🇱 Pokaż PL' : '🇬🇧 Pokaż EN'}
       </button>` : '';
@@ -831,7 +878,7 @@ Views.quiz = {
     const explEn = q.explanation_en || '';
     const explanationText = (showEn && hasEn) ? explEn : explPl;
 
-    const explanationLangBtn = hasEn ? `
+    const explanationLangBtn = (hasEn && AppState.isTester) ? `
       <button class="btn-sm btn-lang-sm"
               onclick="Views.quiz._toggleExplLang(this, ${session.current})"
               data-showing="${showEn ? 'en' : 'pl'}">
