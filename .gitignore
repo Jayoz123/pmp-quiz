@@ -1,0 +1,23 @@
+# ── Artefakty robocze ze skilli (superpowers / brainstorm / plany / specy) ──
+.superpowers/
+plans/
+docs/superpowers/
+
+# ── Cache narzędzi Python ──
+__pycache__/
+*.pyc
+.pytest_cache/
+pytest-cache-files-*/
+
+# ── Logi ──
+*.log
+
+# ── System / edytory ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Git ──
+*.orig
+.git/index.lock
