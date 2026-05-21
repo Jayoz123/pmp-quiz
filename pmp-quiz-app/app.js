@@ -721,7 +721,7 @@ Views.home = {
         <button class="settings-action-btn settings-action-btn--danger"
                 onclick="Views.home._logout()">${t('sign_out')}</button>
         <a class="settings-action-btn settings-action-btn--link"
-           href="#" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
+           href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) Views.home._closeSettings(); });

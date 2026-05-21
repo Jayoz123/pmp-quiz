@@ -59,11 +59,22 @@ git push origin main
 ### Co się dzieje po push:
 
 1. GitHub Actions uruchamia workflow `deploy.yml`
-2. Automatycznie aktualizuje `APP_VERSION` do aktualnego timestamp (np. `202505191430`)
-3. Deployuje folder `pmp-quiz-app/` na Cloudflare Pages
+2. Uruchamia `python tools/build.py` — liczy hash ze WSZYSTKICH cache'owanych
+   assetów (`questions.json`, `app.js`, `styles.css`, `index.html`, `manifest.json`,
+   ikony) i wstrzykuje `APP_VERSION = 'build-xxxxxxxx'` do `app.js` i `service-worker.js`
+3. Deployuje folder `pmp-quiz-app/` na Cloudflare Workers
 4. Aplikacja jest żywa pod: **https://pmp-quiz-app.bart100larski.workers.dev**
 
 Czas od push do live: **~1-2 minuty**.
+
+> **Dlaczego hash zamiast timestamp?** `APP_VERSION` zmienia się tylko wtedy, gdy
+> realnie zmieni się treść któregoś z cache'owanych plików. Każda zmiana kodu lub
+> pytań unieważnia cache (użytkownik dostaje świeżą wersję), a deploy bez zmian w
+> assetach nie wymusza niepotrzebnego pobierania.
+
+> **Deploy ręczny (bez CI)?** Najpierw `python tools/build.py`, dopiero potem
+> `wrangler deploy` — albo jednym poleceniem `npm run deploy`. Sam `wrangler deploy`
+> wgra placeholder `build-00000000` i cache nie będzie się unieważniał.
 
 ---
 
@@ -107,7 +118,8 @@ Otwórz https://pmp-quiz-app.bart100larski.workers.dev w trybie incognito i spra
 APP_VERSION
 ```
 
-Wartość powinna być timestamp z dzisiaj, np. `"202605191430"`. Jeśli tak — CI/CD działa poprawnie.
+Wartość powinna mieć postać `"build-xxxxxxxx"` (8 znaków hasha), np. `"build-a3f9bc12"`,
+i NIE być placeholderem `"build-00000000"`. Jeśli tak — CI/CD działa poprawnie.
 
 ### Szybka lista kontrolna
 
@@ -115,7 +127,7 @@ Wartość powinna być timestamp z dzisiaj, np. `"202605191430"`. Jeśli tak —
 |---|---|---|
 | Workflow odpalił się | GitHub → Actions | Nowy run widoczny po push |
 | Workflow przeszedł bez błędu | GitHub → Actions → ostatni run | Zielony ptaszek ✅ |
-| `APP_VERSION` zaktualizowany | Konsola przeglądarki na prod | Dzisiejszy timestamp |
+| `APP_VERSION` zaktualizowany | Konsola przeglądarki na prod | `build-xxxxxxxx` (nie placeholder) |
 | Strona się ładuje | https://pmp-quiz-app.bart100larski.workers.dev | Aplikacja działa |
 
 > Jeśli wszystkie 4 punkty są zielone — pipeline jest sprawny i możesz deployować bez ręcznej weryfikacji.

@@ -1,0 +1,10 @@
+{
+  "name": "pmp-quiz-app",
+  "version": "1.0.0",
+  "description": "PMP Exam Prep quiz PWA — hash-based Service Worker cache versioning",
+  "private": true,
+  "scripts": {
+    "build": "python tools/build.py",
+    "deploy": "python tools/build.py && wrangler deploy"
+  }
+}

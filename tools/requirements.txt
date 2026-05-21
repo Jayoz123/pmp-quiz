@@ -1,3 +1,5 @@
+# build.py używa wyłącznie biblioteki standardowej (hashlib, re, pathlib) —
+# nie wymaga żadnych dodatkowych zależności.
 pdfplumber==0.11.4
 openpyxl==3.1.2
 pytest==8.2.0
