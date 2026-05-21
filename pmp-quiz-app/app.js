@@ -66,6 +66,14 @@ const I18N = {
   enter_credentials:  { pl: 'Podaj email i hasło.',             en: 'Enter your email and password.' },
   check_email:        { pl: 'Sprawdź email i kliknij link potwierdzający, a potem wróć i zaloguj się.', en: 'Check your email and click the confirmation link, then come back and sign in.' },
   generic_error:      { pl: 'Błąd — spróbuj ponownie.',         en: 'Error — please try again.' },
+  // beta invite codes
+  login_subtitle_beta:{ pl: 'Beta — dostęp tylko z kodem zaproszenia', en: 'Beta — access by invite code only' },
+  code_ph:            { pl: 'Kod beta (PMP-XXXX-XXXX)',         en: 'Beta code (PMP-XXXX-XXXX)' },
+  code_hint:          { pl: 'Nie masz kodu? Napisz do organizatora bety.', en: "Don't have a code? Contact the beta organizer." },
+  sign_up_beta:       { pl: 'Zarejestruj się z kodem',          en: 'Sign up with code' },
+  code_required:      { pl: 'Podaj kod beta w formacie PMP-XXXX-XXXX.', en: 'Enter a beta code in the format PMP-XXXX-XXXX.' },
+  register_verifying: { pl: 'Weryfikuję kod i rejestruję…',     en: 'Verifying code and registering…' },
+  register_ok:        { pl: '✅ Konto utworzone! Sprawdź email i kliknij link potwierdzający, potem wróć i zaloguj się.', en: '✅ Account created! Check your email, click the confirmation link, then come back and sign in.' },
   // home
   settings:           { pl: 'Ustawienia',                       en: 'Settings' },
   streak_start:       { pl: '⚡ Zacznij serię!',                en: '⚡ Start a streak!' },
@@ -235,20 +243,40 @@ const SupabaseSync = {
     } catch (e) { console.warn('pullProgress failed:', e); AppState.syncStatus = 'error'; }
   },
 
-  // Loads the tester flag in an isolated query so a missing `is_tester`
-  // column never breaks the main progress sync. Defaults to false on any error.
-  async pullTesterFlag() {
+  // Loads the full tester profile in an isolated query so a missing table/row
+  // never breaks the main progress sync. `user_profiles` is the source of truth.
+  // Back-compat: accounts created before the beta system have no user_profiles
+  // row, so we fall back to the legacy `user_progress.is_tester` flag and grant
+  // bug-reporting to existing testers (otherwise they'd lose the 🚩 button).
+  async pullProfile() {
     try {
       const { data: { user } } = await sb().auth.getUser();
       if (!user) return;
-      const { data, error } = await sb()
+
+      const { data: profile, error } = await sb()
+        .from('user_profiles')
+        .select('is_tester, can_report_bugs, can_see_debug_info')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!error && profile) {
+        AppState.isTester        = profile.is_tester        ?? false;
+        AppState.canReportBugs   = profile.can_report_bugs   ?? false;
+        AppState.canSeeDebugInfo = profile.can_see_debug_info ?? false;
+        return;
+      }
+
+      // No profile row (legacy account or error) → fall back to user_progress.
+      const { data: legacy } = await sb()
         .from('user_progress')
         .select('is_tester')
         .eq('user_id', user.id)
         .maybeSingle();
-      if (error) return;
-      AppState.isTester = data?.is_tester ?? false;
-    } catch (e) { console.warn('pullTesterFlag failed:', e); }
+      const legacyTester = legacy?.is_tester ?? false;
+      AppState.isTester        = legacyTester;
+      AppState.canReportBugs   = legacyTester;
+      AppState.canSeeDebugInfo = false;
+    } catch (e) { console.warn('pullProfile failed:', e); }
   },
 
   async pushProgress() {
@@ -313,6 +341,24 @@ const Auth = {
   async signUp(email, password) {
     const { error } = await sb().auth.signUp({ email, password });
     if (error) throw error;
+  },
+  // Beta registration goes through the register-beta-user Edge Function, which
+  // is the only way to create an account once "Enable sign ups" is OFF.
+  // Returns { ok } on success, or { error } with a user-facing message.
+  async registerBeta(code, email, password) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/register-beta-user`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'apikey':        SUPABASE_ANON,
+      },
+      body: JSON.stringify({ code, email, password }),
+    });
+    let data;
+    try { data = await res.json(); }
+    catch { throw new Error(t('generic_error')); }
+    return data;
   },
   async signOut() {
     await sb().auth.signOut();
@@ -500,7 +546,9 @@ const AppState = {
   pendingMode:  null,
   pendingDomains: [],
   showEnglish:  false,  // EN/PL toggle state
-  isTester:     false,  // gates per-question EN/PL override (set from Supabase user_progress.is_tester)
+  isTester:        false, // gates per-question EN/PL override (user_profiles.is_tester, source of truth)
+  canReportBugs:   false, // gates the "Report issue" 🚩 button (user_profiles.can_report_bugs)
+  canSeeDebugInfo: false, // gates future diagnostics (user_profiles.can_see_debug_info)
   syncStatus:   'idle', // 'idle' | 'syncing' | 'ok' | 'error'
 };
 
@@ -546,9 +594,9 @@ const App = {
       console.error('Failed to load questions.json', e);
       AppState.questions = [];
     }
-    // Pull cloud progress + tester flag in background — does not block UI
+    // Pull cloud progress + tester profile in background — does not block UI
     SupabaseSync.pullProgress().catch(console.error);
-    SupabaseSync.pullTesterFlag().catch(console.error);
+    SupabaseSync.pullProfile().catch(console.error);
     // Initialize EN/PL state from saved global language preference
     AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
     await new Promise(r => setTimeout(r, 800));
@@ -566,16 +614,22 @@ Views.login = {
       <div class="screen login-screen">
         <div class="login-logo">📋</div>
         <h1 class="login-title">PMP Quiz</h1>
-        <p class="login-subtitle">${t('login_subtitle')}</p>
+        <p class="login-subtitle">${isReg ? t('login_subtitle_beta') : t('login_subtitle')}</p>
         <div class="login-form">
           <input type="email" id="l-email" placeholder="${t('email_ph')}"
                  autocomplete="email" inputmode="email" />
           <input type="password" id="l-pass"
                  placeholder="${t('pass_ph')}"
                  autocomplete="${isReg ? 'new-password' : 'current-password'}" />
+          ${isReg ? `
+          <input type="text" id="l-code" placeholder="${t('code_ph')}"
+                 autocomplete="off" maxlength="13" spellcheck="false"
+                 inputmode="text"
+                 oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')" />
+          <p class="login-beta-hint">${t('code_hint')}</p>` : ''}
           <div id="l-msg" class="login-msg hidden"></div>
           <button class="btn-primary" id="l-submit" onclick="Views.login._submit()">
-            ${isReg ? t('sign_up') : t('sign_in')}
+            ${isReg ? t('sign_up_beta') : t('sign_in')}
           </button>
           <button class="btn-link" onclick="Views.login._toggle()">
             ${isReg ? t('have_account') : t('no_account')}
@@ -596,24 +650,41 @@ Views.login = {
 
     if (!email || !pass) { this._msg(t('enter_credentials'), false); return; }
 
-    btn.disabled    = true;
-    btn.textContent = '…';
+    const registerLabel = t('sign_up_beta');
 
-    try {
-      if (this._mode === 'register') {
-        await Auth.signUp(email, pass);
-        this._msg(t('check_email'), true);
+    if (this._mode === 'register') {
+      const code = document.getElementById('l-code')?.value.trim().toUpperCase();
+      if (!code || code.length < 12) { this._msg(t('code_required'), false); return; }
+
+      btn.disabled = true; btn.textContent = '…';
+      this._msg(t('register_verifying'), true);
+
+      try {
+        const data = await Auth.registerBeta(code, email, pass);
+        if (!data || !data.ok) {
+          this._msg((data && data.error) || t('generic_error'), false);
+          btn.disabled = false; btn.textContent = registerLabel;
+          return;
+        }
+        this._msg(t('register_ok'), true);
         this._mode      = 'login';
         btn.disabled    = false;
         btn.textContent = t('sign_in');
-      } else {
-        await Auth.signIn(email, pass);
-        await App.afterAuth();
+      } catch (e) {
+        this._msg(e.message || t('generic_error'), false);
+        btn.disabled = false; btn.textContent = registerLabel;
       }
+      return;
+    }
+
+    // ── login ──
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      await Auth.signIn(email, pass);
+      await App.afterAuth();
     } catch (e) {
       this._msg(e.message || t('generic_error'), false);
-      btn.disabled    = false;
-      btn.textContent = this._mode === 'register' ? t('sign_up') : t('sign_in');
+      btn.disabled = false; btn.textContent = t('sign_in');
     }
   },
 
@@ -935,7 +1006,7 @@ Views.quiz = {
           <button class="quiz-abandon" onclick="Views.quiz._abandon()" title="${t('back_to_menu')}">✕</button>
           <span class="quiz-counter">${session.current + 1} / ${total}</span>
           ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
-          <button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>
+          ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>` : ''}
         </div>
         <div class="quiz-progress">
           <div class="quiz-progress__bar" style="width:${pct}%"></div>

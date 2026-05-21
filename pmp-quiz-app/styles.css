@@ -457,6 +457,19 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .login-msg.hidden { display: none; }
 .login-msg--ok  { background: var(--green-light);  color: var(--green); }
 .login-msg--err { background: var(--red-light);    color: var(--red); }
+/* Beta invite code field — monospace so it reads as an access code */
+#l-code {
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  text-align: center;
+}
+.login-beta-hint {
+  font-size: 0.78rem;
+  color: var(--text2);
+  text-align: center;
+  margin-top: -6px;
+}
 .btn-link {
   background: none;
   border: none;
