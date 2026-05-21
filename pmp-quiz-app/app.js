@@ -182,11 +182,9 @@ const Storage = {
     else             { cd[questionId][`${confidence}_correct`]++; }
     this.saveConfidenceData(cd);
   },
-  // FIX #6 — odblokowanie działa też między urządzeniami.
-  // quiz_history jest TYLKO lokalne (nie synchronizuje się), więc na nowym
-  // urządzeniu po pull z chmury byłoby puste. streak_data JEST synchronizowane
-  // i dostaje wpis przy każdym ukończonym quizie (markDailyDone/markActivityDone),
-  // więc traktujemy je jako synchronizowalny sygnał "ukończono ≥1 quiz".
+  // Odblokowanie działa między urządzeniami dzięki cross-device sync (plan 09).
+  // quiz_history jest teraz synchronizowane z chmurą; fallback na streak_data
+  // zapewnia poprawne działanie również zanim nastąpi pierwszy pull.
   hasCompletedAnyQuiz() {
     return this.getHistory().length > 0
         || Object.keys(this.getStreakData()).length > 0;
@@ -196,15 +194,16 @@ const Storage = {
 // ==================== SUPABASE SYNC ====================
 const SupabaseSync = {
   async pullProgress() {
+    AppState.syncStatus = 'syncing';
     try {
       const { data: { user } } = await sb().auth.getUser();
-      if (!user) return;
+      if (!user) { AppState.syncStatus = 'idle'; return; }
       const { data, error } = await sb()
         .from('user_progress')
-        .select('streak_data, weak_questions, unlocked_badges')
+        .select('streak_data, weak_questions, unlocked_badges, quiz_history, settings, confidence_data')
         .eq('user_id', user.id)
         .maybeSingle();
-      if (error || !data) return;
+      if (error || !data) { AppState.syncStatus = 'error'; return; }
       // Remote wins for streak + badges (cloud is source of truth)
       if (data.streak_data)     Storage.saveStreakData(data.streak_data);
       if (data.unlocked_badges) Storage.saveUnlockedBadges(data.unlocked_badges);
@@ -217,7 +216,23 @@ const SupabaseSync = {
         });
         Storage.saveWeakQuestions(merged);
       }
-    } catch (e) { console.warn('pullProgress failed:', e); }
+      // quiz_history — cloud wins (full history, use only if non-empty)
+      if (data.quiz_history && Array.isArray(data.quiz_history) && data.quiz_history.length > 0) {
+        Storage._set('quiz_history', data.quiz_history);
+      }
+      // settings — cloud wins, merged over local keys so new local-only keys survive
+      if (data.settings && Object.keys(data.settings).length > 0) {
+        Storage.saveSettings({ ...Storage.getSettings(), ...data.settings });
+        // Keep live language state in sync with pulled settings
+        const pulled = Storage.getSettings();
+        AppState.showEnglish = (pulled.defaultLanguage === 'en');
+      }
+      // confidence_data — cloud wins
+      if (data.confidence_data && Object.keys(data.confidence_data).length > 0) {
+        Storage.saveConfidenceData(data.confidence_data);
+      }
+      AppState.syncStatus = 'ok';
+    } catch (e) { console.warn('pullProgress failed:', e); AppState.syncStatus = 'error'; }
   },
 
   // Loads the tester flag in an isolated query so a missing `is_tester`
@@ -240,12 +255,17 @@ const SupabaseSync = {
     try {
       const { data: { user } } = await sb().auth.getUser();
       if (!user) return;
+      // Limit quiz_history to last 500 entries to keep JSONB column size sane
+      const history = Storage.getHistory().slice(-500);
       await sb().from('user_progress').upsert({
-        user_id:         user.id,
-        streak_data:     Storage.getStreakData(),
-        weak_questions:  Storage.getWeakQuestions(),
-        unlocked_badges: Storage.getUnlockedBadges(),
-        updated_at:      new Date().toISOString(),
+        user_id:          user.id,
+        streak_data:      Storage.getStreakData(),
+        weak_questions:   Storage.getWeakQuestions(),
+        unlocked_badges:  Storage.getUnlockedBadges(),
+        quiz_history:     history,
+        settings:         Storage.getSettings(),
+        confidence_data:  Storage.getConfidenceData(),
+        updated_at:       new Date().toISOString(),
       }, { onConflict: 'user_id' });
     } catch (e) { console.warn('pushProgress failed:', e); }
   },
@@ -481,6 +501,7 @@ const AppState = {
   pendingDomains: [],
   showEnglish:  false,  // EN/PL toggle state
   isTester:     false,  // gates per-question EN/PL override (set from Supabase user_progress.is_tester)
+  syncStatus:   'idle', // 'idle' | 'syncing' | 'ok' | 'error'
 };
 
 // ==================== VIEWS ====================
@@ -635,11 +656,14 @@ Views.home = {
       : streak === 1 ? t('streak_one')
       : t('streak_many', { n: streak });
 
+    const syncLabel = { idle: '', syncing: '⟳ sync…', ok: '✓ zsync.', error: '⚠ offline' }[AppState.syncStatus] || '';
+
     return `
       <div class="screen home">
         <div class="home-topbar">
           <button class="btn-settings" onclick="Views.home._openSettings()" title="${t('settings')}">⚙️</button>
         </div>
+        ${syncLabel ? `<div class="sync-indicator sync-indicator--${AppState.syncStatus}">${syncLabel}</div>` : ''}
         <div id="pwa-install-banner"></div>
         <div class="streak-widget">
           <div class="streak-count">${streakLabel}</div>
@@ -735,6 +759,7 @@ Views.home = {
     const s = Storage.getSettings();
     s.confidenceEnabled = enabled;
     Storage.saveSettings(s);
+    SupabaseSync.pushProgress().catch(console.error);
   },
 
   _setLang(lang) {
@@ -743,6 +768,7 @@ Views.home = {
     Storage.saveSettings(s);
     // Keep the live EN/PL state in sync with the new global preference
     AppState.showEnglish = (lang === 'en');
+    SupabaseSync.pushProgress().catch(console.error);
     // Re-render the whole view behind the modal (so the entire UI switches language),
     // then reopen the modal so its labels + active button reflect the change
     Views.home._closeSettings();
