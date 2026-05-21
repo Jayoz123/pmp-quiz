@@ -73,7 +73,7 @@ const I18N = {
   sign_up_beta:       { pl: 'Zarejestruj się z kodem',          en: 'Sign up with code' },
   code_required:      { pl: 'Podaj kod beta w formacie PMP-XXXX-XXXX.', en: 'Enter a beta code in the format PMP-XXXX-XXXX.' },
   register_verifying: { pl: 'Weryfikuję kod i rejestruję…',     en: 'Verifying code and registering…' },
-  register_ok:        { pl: '✅ Konto utworzone! Sprawdź email i kliknij link potwierdzający, potem wróć i zaloguj się.', en: '✅ Account created! Check your email, click the confirmation link, then come back and sign in.' },
+  register_ok:        { pl: '✅ Konto utworzone! Możesz się teraz zalogować.', en: '✅ Account created! You can sign in now.' },
   // home
   settings:           { pl: 'Ustawienia',                       en: 'Settings' },
   streak_start:       { pl: '⚡ Zacznij serię!',                en: '⚡ Start a streak!' },
