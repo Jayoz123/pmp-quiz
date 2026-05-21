@@ -1,8 +1,9 @@
 'use strict';
 
-// FIX #3 — wersjonowanie cache: zmień APP_VERSION przy każdym deployu
-// Musi być zsynchronizowane z APP_VERSION w app.js
-const APP_VERSION = '2.3.0';
+// UWAGA: APP_VERSION jest generowany automatycznie przez tools/build.py
+// (hash ze wszystkich cache'owanych assetów). NIE modyfikuj tej linii ręcznie —
+// uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
+const APP_VERSION = 'build-00000000';  // placeholder, nadpisywany przez build.py
 const CACHE_NAME  = `pmp-quiz-${APP_VERSION}`;
 
 const ASSETS = [

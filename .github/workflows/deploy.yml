@@ -14,12 +14,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Auto-bump APP_VERSION (timestamp)
-        run: |
-          VERSION=$(date -u +%Y%m%d%H%M)
-          echo "Deploying version: $VERSION"
-          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '$VERSION'/" pmp-quiz-app/app.js
-          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '$VERSION'/" pmp-quiz-app/service-worker.js
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Generate build hash (APP_VERSION)
+        run: python tools/build.py
 
       - name: Deploy to Cloudflare Pages
         env:

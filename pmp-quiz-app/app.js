@@ -1,8 +1,9 @@
 'use strict';
 
 // ==================== VERSION ====================
-// Bump this string on every deploy to invalidate the Service Worker cache
-const APP_VERSION = '2.3.0';
+// UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
+// Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
+const APP_VERSION = 'build-00000000';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -181,7 +182,15 @@ const Storage = {
     else             { cd[questionId][`${confidence}_correct`]++; }
     this.saveConfidenceData(cd);
   },
-  hasCompletedAnyQuiz() { return this.getHistory().length > 0; },
+  // FIX #6 — odblokowanie działa też między urządzeniami.
+  // quiz_history jest TYLKO lokalne (nie synchronizuje się), więc na nowym
+  // urządzeniu po pull z chmury byłoby puste. streak_data JEST synchronizowane
+  // i dostaje wpis przy każdym ukończonym quizie (markDailyDone/markActivityDone),
+  // więc traktujemy je jako synchronizowalny sygnał "ukończono ≥1 quiz".
+  hasCompletedAnyQuiz() {
+    return this.getHistory().length > 0
+        || Object.keys(this.getStreakData()).length > 0;
+  },
 };
 
 // ==================== SUPABASE SYNC ====================
@@ -762,8 +771,10 @@ Views['mode-select'] = {
     const domains    = [...new Set(AppState.questions.map(q => q.domain).filter(Boolean))].sort();
     const weakCount  = QuizEngine.countWeakQuestions(AppState.questions);
     // FIX #5 — odblokuj po ukończeniu DOWOLNEGO quizu, nie po 10 błędach
+    // FIX #6 — karta zawsze widoczna; wyblakła (disabled) gdy nie ma czego grać:
+    //          albo brak ukończonego quizu, albo 0 słabych pytań do powtórki.
     const neverPlayed  = !Storage.hasCompletedAnyQuiz();
-    const weakDisabled = neverPlayed;
+    const weakDisabled = neverPlayed || weakCount === 0;
     const self = Views['mode-select'];
 
     const domainChips = domains.map(d => {
