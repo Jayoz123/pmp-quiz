@@ -66,6 +66,7 @@ const I18N = {
   enter_credentials:  { pl: 'Podaj email i hasło.',             en: 'Enter your email and password.' },
   check_email:        { pl: 'Sprawdź email i kliknij link potwierdzający, a potem wróć i zaloguj się.', en: 'Check your email and click the confirmation link, then come back and sign in.' },
   generic_error:      { pl: 'Błąd — spróbuj ponownie.',         en: 'Error — please try again.' },
+  session_kicked:     { pl: 'Konto zostało zalogowane na innym urządzeniu. Zaloguj się ponownie.', en: 'Your account was signed in on another device. Please sign in again.' },
   // beta invite codes
   login_subtitle_beta:{ pl: 'Beta — dostęp tylko z kodem zaproszenia', en: 'Beta — access by invite code only' },
   code_ph:            { pl: 'Kod beta (PMP-XXXX-XXXX)',         en: 'Beta code (PMP-XXXX-XXXX)' },
@@ -332,6 +333,90 @@ const SupabaseSync = {
   },
 };
 
+// ==================== SESSION GUARD ====================
+// One account = one active device. Each device holds a random device_token in
+// localStorage and mirrors it into user_sessions on login. On app start we
+// compare the two; a mismatch means another device logged in → force sign-out.
+// See plans/07-multi-device-protection.md.
+const SessionGuard = {
+  STORAGE_KEY: 'device_token',
+
+  // Get (or lazily create) this device's persistent token.
+  getLocalToken() {
+    let token = localStorage.getItem(this.STORAGE_KEY);
+    if (!token) {
+      token = (crypto.randomUUID ? crypto.randomUUID()
+                                 : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      localStorage.setItem(this.STORAGE_KEY, token);
+    }
+    return token;
+  },
+
+  // On login: claim this account for this device (overwrites the previous row).
+  async registerDevice() {
+    try {
+      const { data: { user } } = await sb().auth.getUser();
+      if (!user) return;
+      const token = this.getLocalToken();
+      const now   = new Date().toISOString();
+      await sb().from('user_sessions').upsert({
+        user_id:      user.id,
+        device_token: token,
+        device_info:  navigator.userAgent.substring(0, 80),
+        logged_in_at: now,
+        last_seen_at: now,
+      }, { onConflict: 'user_id' });
+    } catch (e) { console.warn('registerDevice failed:', e); }
+  },
+
+  // On app start: is this device still the active one for the account?
+  // Fail-open on network/query errors so a transient Supabase hiccup never
+  // locks a legitimately-logged-in user out of an offline-capable PWA.
+  async verify() {
+    try {
+      const { data: { user } } = await sb().auth.getUser();
+      if (!user) return true; // no auth session = nothing to guard
+
+      const localToken = localStorage.getItem(this.STORAGE_KEY);
+
+      const { data, error } = await sb()
+        .from('user_sessions')
+        .select('device_token')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) return true;        // query failed → don't kick on a hiccup
+      if (!data)  return true;        // no device claimed yet (legacy/first run) → allow
+      if (!localToken) return false;  // a device owns this account, but it isn't us
+      return data.device_token === localToken;
+    } catch (e) { console.warn('SessionGuard.verify failed:', e); return true; }
+  },
+
+  // Optional: refresh last_seen_at (called on a timer) for activity monitoring.
+  async heartbeat() {
+    try {
+      const { data: { user } } = await sb().auth.getUser();
+      if (!user) return;
+      await sb().from('user_sessions')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+    } catch (e) { /* non-critical */ }
+  },
+
+  // Start the 5-minute heartbeat. Idempotent: a second login in the same page
+  // load (logout → login, no reload) won't stack multiple timers.
+  _heartbeatTimer: null,
+  startHeartbeat() {
+    if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
+    this._heartbeatTimer = setInterval(() => this.heartbeat(), 5 * 60 * 1000);
+  },
+
+  // On manual logout: drop the local token so the next login is unconstrained.
+  clearLocalToken() {
+    localStorage.removeItem(this.STORAGE_KEY);
+  },
+};
+
 // ==================== AUTH ====================
 const Auth = {
   async signIn(email, password) {
@@ -550,6 +635,7 @@ const AppState = {
   canReportBugs:   false, // gates the "Report issue" 🚩 button (user_profiles.can_report_bugs)
   canSeeDebugInfo: false, // gates future diagnostics (user_profiles.can_see_debug_info)
   syncStatus:   'idle', // 'idle' | 'syncing' | 'ok' | 'error'
+  sessionKickedMsg: null, // set when SessionGuard kicks this device; shown once on the login screen
 };
 
 // ==================== VIEWS ====================
@@ -583,6 +669,15 @@ const App = {
       this.navigate('login');
       return;
     }
+    // Multi-device guard: if another device has claimed this account since we
+    // last opened the app, sign out here and bounce to login with a notice.
+    const isValid = await SessionGuard.verify();
+    if (!isValid) {
+      SessionGuard.clearLocalToken();
+      await sb().auth.signOut();
+      this.navigate('login', { sessionKickedMsg: t('session_kicked') });
+      return;
+    }
     await this.afterAuth();
   },
 
@@ -594,6 +689,9 @@ const App = {
       console.error('Failed to load questions.json', e);
       AppState.questions = [];
     }
+    // Claim this account for this device (overwrites any previous device's
+    // token). Awaited so the binding is written before the session is "active".
+    await SessionGuard.registerDevice();
     // Pull cloud progress + tester profile in background — does not block UI
     SupabaseSync.pullProgress().catch(console.error);
     SupabaseSync.pullProfile().catch(console.error);
@@ -601,6 +699,7 @@ const App = {
     AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
     await new Promise(r => setTimeout(r, 800));
     this.navigate('home');
+    SessionGuard.startHeartbeat();
   },
 };
 
@@ -610,11 +709,14 @@ Views.login = {
 
   render() {
     const isReg = this._mode === 'register';
+    const kickedBanner = AppState.sessionKickedMsg ? `
+        <div class="login-kicked-banner">⚠️ ${AppState.sessionKickedMsg}</div>` : '';
     return `
       <div class="screen login-screen">
         <div class="login-logo">📋</div>
         <h1 class="login-title">PMP Quiz</h1>
         <p class="login-subtitle">${isReg ? t('login_subtitle_beta') : t('login_subtitle')}</p>
+        ${kickedBanner}
         <div class="login-form">
           <input type="email" id="l-email" placeholder="${t('email_ph')}"
                  autocomplete="email" inputmode="email" />
@@ -695,7 +797,11 @@ Views.login = {
     el.className   = `login-msg ${ok ? 'login-msg--ok' : 'login-msg--err'}`;
   },
 
-  init() {},
+  init() {
+    // The "kicked" notice is shown once; clear it so re-renders (e.g. toggling
+    // to the register form) and the next login screen don't keep showing it.
+    AppState.sessionKickedMsg = null;
+  },
 };
 
 // ==================== LOADING VIEW ====================
@@ -850,6 +956,7 @@ Views.home = {
   async _logout() {
     Views.home._closeSettings();
     if (!confirm(t('sign_out_confirm'))) return;
+    SessionGuard.clearLocalToken();
     await Auth.signOut();
     App.navigate('login');
   },
