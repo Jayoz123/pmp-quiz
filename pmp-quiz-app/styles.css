@@ -236,18 +236,41 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 
 /* ===== QUIZ SCREEN ===== */
 .quiz { display: flex; flex-direction: column; gap: 16px; min-height: 100vh; }
-.quiz-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.quiz-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+}
 .quiz-abandon {
   font-size: 1rem;
   color: var(--text2);
   padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   line-height: 1;
   flex-shrink: 0;
+  justify-self: start;
   transition: color var(--transition), background var(--transition);
 }
 .quiz-abandon:hover { color: var(--text); background: var(--surface2); }
-.quiz-counter { font-size: 0.85rem; font-weight: 600; color: var(--text2); white-space: nowrap; }
+.quiz-counter {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  text-align: center;
+}
+.quiz-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: end;
+}
+.quiz-subheader {
+  display: flex;
+  justify-content: center;
+  margin-top: -8px;
+}
 .quiz-domain {
   font-size: 0.75rem;
   font-weight: 600;

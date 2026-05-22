@@ -1112,13 +1112,15 @@ Views.quiz = {
         <div class="quiz-header">
           <button class="quiz-abandon" onclick="Views.quiz._abandon()" title="${t('back_to_menu')}">✕</button>
           <span class="quiz-counter">${session.current + 1} / ${total}</span>
-          ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
-          ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>` : ''}
+          <div class="quiz-header-actions">
+            ${langToggle}
+            ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>` : ''}
+          </div>
         </div>
+        ${q.domain ? `<div class="quiz-subheader"><span class="quiz-domain">${tDomain(q.domain)}</span></div>` : ''}
         <div class="quiz-progress">
           <div class="quiz-progress__bar" style="width:${pct}%"></div>
         </div>
-        ${langToggle}
         <div class="quiz-question">${questionText}</div>
         <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
         <div id="explanation-panel" class="hidden"></div>
