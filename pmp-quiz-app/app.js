@@ -911,8 +911,8 @@ Views.home = {
               <div class="settings-row__desc">${t('app_language_desc')}</div>
             </div>
           </div>
-          <div class="settings-lang-select">
-            <button class="btn-lang-opt ${settings.defaultLanguage === 'en' ? '' : 'active'}"
+          <div class="lang-pill-toggle">
+            <button class="btn-lang-opt ${settings.defaultLanguage !== 'en' ? 'active' : ''}"
                     onclick="Views.home._setLang('pl')">🇵🇱 PL</button>
             <button class="btn-lang-opt ${settings.defaultLanguage === 'en' ? 'active' : ''}"
                     onclick="Views.home._setLang('en')">🇬🇧 EN</button>
@@ -1502,4 +1502,4 @@ Views.summary = {
             <span>${t('in_a_row', { n: s.bestStreak })}</span>
           </div>
           ${s.weakestDomain ? `
-      
+          

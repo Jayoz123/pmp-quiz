@@ -795,6 +795,32 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   color: var(--accent);
 }
 
+/* Language pill toggle — replaces separate PL/EN buttons */
+.lang-pill-toggle {
+  display: flex;
+  background: var(--surface2);
+  border-radius: var(--radius-xs);
+  padding: 3px;
+  gap: 0;
+  flex-shrink: 0;
+}
+.lang-pill-toggle .btn-lang-opt {
+  padding: 5px 14px;
+  border: none;
+  border-radius: calc(var(--radius-xs) - 3px);
+  background: transparent;
+  color: var(--text2);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.lang-pill-toggle .btn-lang-opt.active {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+}
+
 /* Toggle switch */
 .settings-toggle {
   position: relative;
@@ -815,25 +841,4 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .settings-toggle__slider::before {
   content: '';
   position: absolute;
-  width: 22px;
-  height: 22px;
-  left: 3px;
-  top: 3px;
-  background: var(--surface);
-  border-radius: 50%;
-  transition: transform var(--transition);
-  -webkit-transition: -webkit-transform var(--transition);
-  -webkit-transform: translateX(0);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-}
-.settings-toggle input:checked + .settings-toggle__slider { background: var(--accent); }
-.settings-toggle input:checked + .settings-toggle__slider::before {
-  transform: translateX(22px);
-  -webkit-transform: translateX(22px);
-}
-
-/* Action buttons inside settings */
-.settings-action-btn {
-  display: block;
-  width: 100%;
-  padding: 
+  width
