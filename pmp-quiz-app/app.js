@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-00000000';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-f2b097c4';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -78,7 +78,11 @@ const I18N = {
   // home
   settings:           { pl: 'Ustawienia',                       en: 'Settings' },
   streak_start:       { pl: '⚡ Zacznij serię!',                en: '⚡ Start a streak!' },
-  streak_one:         { pl: '🔥 1 dzień z rzędu',               en: '🔥 1 day in a row' },
+  streak_one:         { pl: '🔥 Dobry początek!',               en: '🔥 Good start!' },
+  streak_two:         { pl: '🔥 Dwa dni z rzędu!',              en: '🔥 Two days running!' },
+  streak_roll:        { pl: '🔥 Jesteś na fali!',               en: "🔥 You're on a roll!" },
+  streak_keep:        { pl: '🔥 Nie zatrzymuj się!',             en: '🔥 Keep it going!' },
+  streak_fire:        { pl: '🔥 Tydzień ognia!',                 en: "🔥 You're on Fire! 🔥" },
   streak_many:        { pl: '🔥 {n} dni z rzędu',               en: '🔥 {n} days in a row' },
   daily_challenge:    { pl: 'Codzienne Wyzwanie',               en: 'Daily Challenge' },
   daily_done:         { pl: '30 pytań · Ukończono dziś ✓',      en: '30 questions · Done today ✓' },
@@ -102,7 +106,7 @@ const I18N = {
   standard_quiz:      { pl: '⚡ Standardowy Quiz',              en: '⚡ Standard Quiz' },
   standard_quiz_desc: { pl: '10 losowych pytań z wybranych domen', en: '10 random questions from selected domains' },
   filter_domains:     { pl: 'Filtruj domeny (domyślnie wszystkie):', en: 'Filter domains (all by default):' },
-  weak_questions:     { pl: '📖 Moje słabe pytania',            en: '📖 My weak questions' },
+  weak_questions:     { pl: '🎯 Moje słabe pytania',            en: '🎯 My weak questions' },
   weak_locked:        { pl: 'Ukończ pierwszy quiz, żeby odblokować', en: 'Complete your first quiz to unlock' },
   weak_none:          { pl: 'Nie masz jeszcze słabych pytań 🎉', en: "You don't have any weak questions yet 🎉" },
   weak_count:         { pl: '{n} pytań do powtórki',            en: '{n} questions to review' },
@@ -173,8 +177,10 @@ const Storage = {
   },
   getHistory()          { return this._get('quiz_history', []); },
   saveResult(r)         { const h = this.getHistory(); h.push(r); this._set('quiz_history', h); },
-  getStreakData()        { return this._get('streak_data', {}); },
-  saveStreakData(d)      { this._set('streak_data', d); },
+  getStreakData()           { return this._get('streak_data', {}); },
+  saveStreakData(d)         { this._set('streak_data', d); },
+  getStreakWeekStartDow()   { return this._get('streak_week_start_dow', null); },
+  saveStreakWeekStartDow(d) { this._set('streak_week_start_dow', d); },
   getWeakQuestions()    { return this._get('weak_questions', {}); },
   saveWeakQuestions(wq) { this._set('weak_questions', wq); },
   getUnlockedBadges()   { return this._get('unlocked_badges', []); },
@@ -209,12 +215,15 @@ const SupabaseSync = {
       if (!user) { AppState.syncStatus = 'idle'; return; }
       const { data, error } = await sb()
         .from('user_progress')
-        .select('streak_data, weak_questions, unlocked_badges, quiz_history, settings, confidence_data')
+        .select('streak_data, streak_week_start_dow, weak_questions, unlocked_badges, quiz_history, settings, confidence_data')
         .eq('user_id', user.id)
         .maybeSingle();
       if (error || !data) { AppState.syncStatus = 'error'; return; }
       // Remote wins for streak + badges (cloud is source of truth)
       if (data.streak_data)     Storage.saveStreakData(data.streak_data);
+      if (data.streak_week_start_dow !== undefined && data.streak_week_start_dow !== null) {
+        Storage.saveStreakWeekStartDow(data.streak_week_start_dow);
+      }
       if (data.unlocked_badges) Storage.saveUnlockedBadges(data.unlocked_badges);
       // Merge weak_questions: take max error count per question
       if (data.weak_questions) {
@@ -287,14 +296,15 @@ const SupabaseSync = {
       // Limit quiz_history to last 500 entries to keep JSONB column size sane
       const history = Storage.getHistory().slice(-500);
       await sb().from('user_progress').upsert({
-        user_id:          user.id,
-        streak_data:      Storage.getStreakData(),
-        weak_questions:   Storage.getWeakQuestions(),
-        unlocked_badges:  Storage.getUnlockedBadges(),
-        quiz_history:     history,
-        settings:         Storage.getSettings(),
-        confidence_data:  Storage.getConfidenceData(),
-        updated_at:       new Date().toISOString(),
+        user_id:               user.id,
+        streak_data:           Storage.getStreakData(),
+        streak_week_start_dow: Storage.getStreakWeekStartDow(),
+        weak_questions:        Storage.getWeakQuestions(),
+        unlocked_badges:       Storage.getUnlockedBadges(),
+        quiz_history:          history,
+        settings:              Storage.getSettings(),
+        confidence_data:       Storage.getConfidenceData(),
+        updated_at:            new Date().toISOString(),
       }, { onConflict: 'user_id' });
     } catch (e) { console.warn('pushProgress failed:', e); }
   },
@@ -568,6 +578,46 @@ const StreakManager = {
       return { date: key, status: data[key] || 'none' };
     });
   },
+  getWeekDays() {
+    const data = Storage.getStreakData();
+    let startDow = Storage.getStreakWeekStartDow();
+
+    // Pierwsza wizyta — zapisz bieżący dzień tygodnia jako punkt startowy
+    if (startDow === null) {
+      startDow = (new Date().getDay() + 6) % 7; // JS 0=Nd → 0=Pn
+      Storage.saveStreakWeekStartDow(startDow);
+    }
+
+    const today = new Date();
+    const todayDow = (today.getDay() + 6) % 7;
+    // Ile dni wstecz do początku bieżącego tygodnia widgetu
+    const daysBack = (todayDow - startDow + 7) % 7;
+
+    const todayKey = TODAY();
+    const dayNamesPl = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+    const dayNamesEn = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - daysBack + i);
+      const key = d.toISOString().slice(0, 10);
+      const isToday  = key === todayKey;
+      const isFuture = d > today && !isToday;
+      const dow = (d.getDay() + 6) % 7;
+      const status = isFuture           ? 'future'
+        : data[key] === 'daily'         ? 'done'
+        : data[key] === 'activity'      ? 'activity'
+        : isToday                       ? 'today'
+        : 'missed';
+      return {
+        date:     key,
+        dayShort: AppState.showEnglish ? dayNamesEn[dow] : dayNamesPl[dow],
+        dayNum:   d.getDate(),
+        status,
+        isToday,
+      };
+    });
+  },
 };
 
 // ==================== BADGE MANAGER ====================
@@ -825,13 +875,28 @@ Views.home = {
   render() {
     const streak     = StreakManager.getCurrentStreak();
     const dailyDone  = StreakManager.isDailyDoneToday();
-    const days       = StreakManager.getLast30Days();
-    const dots       = days.map(d =>
-      `<div class="streak-dot streak-dot--${d.status}" title="${d.date}"></div>`
-    ).join('');
+    const weekDays   = StreakManager.getWeekDays();
+
     const streakLabel = streak === 0 ? t('streak_start')
       : streak === 1 ? t('streak_one')
-      : t('streak_many', { n: streak });
+      : streak === 2 ? t('streak_two')
+      : streak <= 4  ? t('streak_roll')
+      : streak <= 6  ? t('streak_keep')
+      : t('streak_fire');
+
+    const dayCells = weekDays.map(d => {
+      const classes = [
+        'streak-day',
+        `streak-day--${d.status}`,
+        d.isToday ? 'streak-day--today' : '',
+      ].filter(Boolean).join(' ');
+      return `
+        <div class="${classes}">
+          <span class="streak-day__label">${d.dayShort}</span>
+          <div class="streak-day__circle"></div>
+          <span class="streak-day__num">${d.dayNum}</span>
+        </div>`;
+    }).join('');
 
     const syncLabel = { idle: '', syncing: '⟳ sync…', ok: '✓ zsync.', error: '⚠ offline' }[AppState.syncStatus] || '';
 
@@ -843,8 +908,9 @@ Views.home = {
         ${syncLabel ? `<div class="sync-indicator sync-indicator--${AppState.syncStatus}">${syncLabel}</div>` : ''}
         <div id="pwa-install-banner"></div>
         <div class="streak-widget">
-          <div class="streak-count">${streakLabel}</div>
-          <div class="streak-dots">${dots}</div>
+          <div class="streak-week">${dayCells}</div>
+          <hr class="streak-divider">
+          <div class="streak-message">${streakLabel}</div>
         </div>
         <div class="menu">
           <button class="menu-btn menu-btn--daily ${dailyDone ? 'done' : 'pending'}"
@@ -911,8 +977,8 @@ Views.home = {
               <div class="settings-row__desc">${t('app_language_desc')}</div>
             </div>
           </div>
-          <div class="lang-pill-toggle">
-            <button class="btn-lang-opt ${settings.defaultLanguage !== 'en' ? 'active' : ''}"
+          <div class="settings-lang-select">
+            <button class="btn-lang-opt ${settings.defaultLanguage === 'en' ? '' : 'active'}"
                     onclick="Views.home._setLang('pl')">🇵🇱 PL</button>
             <button class="btn-lang-opt ${settings.defaultLanguage === 'en' ? 'active' : ''}"
                     onclick="Views.home._setLang('en')">🇬🇧 EN</button>
@@ -1007,7 +1073,7 @@ Views['mode-select'] = {
         </div>
         <div class="mode-card ${self._selectedMode === 'weak' ? 'selected' : ''} ${weakDisabled ? 'disabled' : ''}"
              ${weakDisabled ? '' : "onclick=\"Views['mode-select']._selectMode('weak')\""}>
-          <h3>${t('weak_questions')} ${weakDisabled ? '<span style="font-size:0.85em;opacity:0.6">🔒</span>' : ''}</h3>
+          <h3>${t('weak_questions')}</h3>
           <p>${weakSubtitle}</p>
         </div>
         <button class="btn-primary" style="margin-top:8px"
@@ -1042,7 +1108,7 @@ Views['mode-select'] = {
       alert(t('no_questions_filter'));
       return;
     }
-    AppState.quizSession    = { questions, current: 0, answers: [], mode: this._selectedMode, shuffledMap: {}, recentlyShown: [] };
+    AppState.quizSession    = { questions, current: 0, answers: [], mode: this._selectedMode, shuffledMap: {}, recentlyShown: [], currentAnswer: null };
     this._selectedDomains   = [];
     this._selectedMode      = 'quick';
     App.navigate('quiz');
@@ -1067,7 +1133,7 @@ Views['daily-start'] = {
       return;
     }
     const questions = QuizEngine.selectQuestions(AppState.questions, 'daily');
-    AppState.quizSession = { questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [] };
+    AppState.quizSession = { questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [], currentAnswer: null };
     App.navigate('quiz');
   },
 };
@@ -1112,15 +1178,13 @@ Views.quiz = {
         <div class="quiz-header">
           <button class="quiz-abandon" onclick="Views.quiz._abandon()" title="${t('back_to_menu')}">✕</button>
           <span class="quiz-counter">${session.current + 1} / ${total}</span>
-          <div class="quiz-header-actions">
-            ${langToggle}
-            ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>` : ''}
-          </div>
+          ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
+          ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>` : ''}
         </div>
-        ${q.domain ? `<div class="quiz-subheader"><span class="quiz-domain">${tDomain(q.domain)}</span></div>` : ''}
         <div class="quiz-progress">
           <div class="quiz-progress__bar" style="width:${pct}%"></div>
         </div>
+        ${langToggle}
         <div class="quiz-question">${questionText}</div>
         <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
         <div id="explanation-panel" class="hidden"></div>
@@ -1129,7 +1193,49 @@ Views.quiz = {
 
   _toggleLang() {
     AppState.showEnglish = !AppState.showEnglish;
-    App.render();
+
+    const session = AppState.quizSession;
+    const q       = session.questions[session.current];
+    const map     = session.shuffledMap[session.current];
+    const showEn  = AppState.showEnglish;
+    const hasEn   = !!(q.question_en && map.displayAnswers_en[0]);
+
+    // 1. Swap question text
+    const questionEl = document.querySelector('.quiz-question');
+    if (questionEl) {
+      questionEl.textContent = (showEn && hasEn) ? q.question_en : q.question;
+    }
+
+    // 2. Swap answer labels — leave button disabled/class state untouched
+    const displayAnswers = (showEn && hasEn) ? map.displayAnswers_en : map.displayAnswers_pl;
+    document.querySelectorAll('.answer-btn').forEach((btn, i) => {
+      const span = btn.querySelector('span:last-child');
+      if (span) span.textContent = displayAnswers[i];
+    });
+
+    // 3. Swap flag on the toggle button itself
+    const toggleBtn = document.querySelector('.btn-lang-toggle');
+    if (toggleBtn) {
+      toggleBtn.textContent = showEn ? '🇵🇱' : '🇬🇧';
+      toggleBtn.title       = showEn ? 'PL' : 'EN';
+      toggleBtn.setAttribute('aria-label', showEn ? 'PL' : 'EN');
+    }
+
+    // 4. If explanation panel is already visible, swap its text too
+    const explTextEl = document.getElementById('expl-text');
+    if (explTextEl) {
+      explTextEl.textContent = (showEn && hasEn)
+        ? (q.explanation_en || q.explanation)
+        : q.explanation;
+    }
+    // Also sync the explanation language button (btn-lang-sm) if present
+    const explLangBtn = document.querySelector('.btn-lang-sm');
+    if (explLangBtn) {
+      explLangBtn.dataset.showing = showEn ? 'en' : 'pl';
+      explLangBtn.textContent     = showEn ? '🇵🇱' : '🇬🇧';
+      explLangBtn.title           = showEn ? 'PL' : 'EN';
+      explLangBtn.setAttribute('aria-label', showEn ? 'PL' : 'EN');
+    }
   },
 
   _selectAnswer(selectedIndex) {
@@ -1139,6 +1245,9 @@ Views.quiz = {
     });
     // Mark selected as pending (visual only — correct/wrong applied in _processAnswer)
     document.querySelectorAll('.answer-btn')[selectedIndex]?.classList.add('answer-btn--pending');
+
+    // Persist selected index so _toggleLang() can swap text without losing answer state
+    AppState.quizSession.currentAnswer = { selectedIndex, isCorrect: null, processed: false };
 
     if (Storage.getSettings().confidenceEnabled) {
       this._showConfidenceOverlay(selectedIndex);
@@ -1193,6 +1302,9 @@ Views.quiz = {
     const isCorrect = selectedIndex === correctDisplayIndex;
     const showEn    = AppState.showEnglish;
     const hasEn     = !!(q.question_en && map.displayAnswers_en[0]);
+
+    // Update persisted answer state so _toggleLang() can swap language without resetting UI
+    session.currentAnswer = { selectedIndex, isCorrect, processed: true };
 
     // Remove pending state, apply correct/wrong highlight
     document.querySelectorAll('.answer-btn').forEach(btn => {
@@ -1372,6 +1484,7 @@ Views.quiz = {
   _advance() {
     const session = AppState.quizSession;
     session.current++;
+    session.currentAnswer = null; // reset for the next question
     if (session.current >= session.questions.length) {
       this._finishQuiz();
     } else {
@@ -1550,14 +1663,14 @@ Views.stats = {
     const unlocked = Storage.getUnlockedBadges();
     const days = StreakManager.getLast30Days();
 
-    const avgVal = v => v !== null ? `${v}%` : '0%';
+    const avgVal = v => v !== null ? `${v}%` : '—';
     const domainBars = perDomain.map(d => `
       <div class="domain-bar">
         <span class="domain-bar__name">${tDomain(d.domain)}</span>
         <div class="domain-bar__track">
           <div class="domain-bar__fill" style="width:0%" data-target="${d.percent ?? 0}"></div>
         </div>
-        <span class="domain-bar__pct">${d.percent !== null ? d.percent + '%' : '0%'}</span>
+        <span class="domain-bar__pct">${d.percent !== null ? d.percent + '%' : '—'}</span>
       </div>`).join('');
 
     const badgeItems = BADGES_DEF.map(b => `

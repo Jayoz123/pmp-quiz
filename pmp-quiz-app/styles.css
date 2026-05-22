@@ -122,15 +122,97 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .streak-widget {
   background: var(--surface);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 16px 12px 14px;
   box-shadow: var(--shadow);
 }
-.streak-count {
-  font-size: 1.2rem;
+
+/* ---- Streak Week Widget ---- */
+.streak-week {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.streak-day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.streak-day__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.streak-day__circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.streak-day__num {
+  font-size: 0.72rem;
+  color: var(--text2);
+}
+
+/* Stany */
+.streak-day--future .streak-day__circle { background: var(--surface2); }
+.streak-day--missed .streak-day__circle { background: var(--surface2); }
+
+/* Aktywność (był quiz, nie daily) — żółty */
+.streak-day--activity .streak-day__circle {
+  background: var(--yellow-light, #fef9c3);
+  border: 2px solid var(--yellow);
+}
+.streak-day--activity .streak-day__circle::after { content: '✓'; color: var(--yellow); font-weight: 700; }
+
+/* Dzień ukończony (daily done) — zielony */
+.streak-day--done .streak-day__circle {
+  background: var(--green-light, #dcfce7);
+  border: 2px solid var(--green);
+}
+.streak-day--done .streak-day__circle::after { content: '✓'; color: var(--green); font-weight: 700; }
+
+/* Dzisiejszy dzień — accent (indigo) */
+.streak-day--today .streak-day__label { color: var(--accent); }
+.streak-day--today .streak-day__circle {
+  background: var(--accent);
+  border: 2px solid var(--accent);
+}
+.streak-day--today .streak-day__num { color: var(--accent); font-weight: 700; }
+
+/* Dzisiejszy + done → zielony okrąg z accent-obwódką */
+.streak-day--today.streak-day--done .streak-day__circle {
+  background: var(--green);
+  border: 3px solid var(--accent);
+}
+.streak-day--today.streak-day--done .streak-day__circle::after { content: '✓'; color: #fff; }
+
+/* Divider + komunikat */
+.streak-widget hr.streak-divider {
+  border: none;
+  border-top: 1px solid var(--surface2);
+  margin: 12px 0 10px;
+}
+
+.streak-message {
+  font-size: 1rem;
   font-weight: 700;
-  margin-bottom: 12px;
+  text-align: center;
   color: var(--text);
 }
+
+/* ---- Legacy 30-day dots (StatsView) ---- */
 .streak-dots {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
