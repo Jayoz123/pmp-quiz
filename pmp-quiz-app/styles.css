@@ -172,13 +172,19 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .domain-chip {
   padding: 5px 12px;
   border-radius: var(--radius-xs);
-  background: var(--surface2);
+  background: transparent;
   font-size: 0.8rem;
   cursor: pointer;
-  transition: background var(--transition), color var(--transition);
-  border: 1.5px solid transparent;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  border: 1.5px solid var(--border);
+  color: var(--text2);
 }
 .domain-chip.selected { background: var(--accent-light); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.domain-chip:not(.selected):hover {
+  background: var(--surface2);
+  border-color: var(--text2);
+  color: var(--text);
+}
 
 .btn-primary {
   width: 100%;
@@ -825,9 +831,4 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   align-items: center;
   gap: 4px;
   pointer-events: none;
-  z-index: 50;
-  opacity: 0.85;
-}
-.sync-indicator--ok    { color: var(--green); }
-.sync-indicator--error { color: var(--red); }
-.sync-indicator--syncing { color: var(--text2); }
+  z
