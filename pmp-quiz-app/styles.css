@@ -814,4 +814,20 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .settings-action-btn--danger { background: rgba(239,68,68,0.12); color: var(--red); }
 .settings-action-btn--link   { background: var(--surface2); color: var(--text2); }
 
-/* ====================
+/* ==================== SYNC INDICATOR ==================== */
+.sync-indicator {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  font-size: 0.7rem;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.85;
+}
+.sync-indicator--ok    { color: var(--green); }
+.sync-indicator--error { color: var(--red); }
+.sync-indicator--syncing { color: var(--text2); }
