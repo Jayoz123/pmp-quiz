@@ -17,8 +17,9 @@
   --border: #e2e8f0;
   --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
   --shadow-lg: 0 10px 25px rgba(0,0,0,0.12);
-  --radius: 14px;
-  --radius-sm: 8px;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --radius-xs: 8px;
   --transition: 0.2s ease;
   --max-width: 480px;
 }
@@ -170,7 +171,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .domain-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .domain-chip {
   padding: 5px 12px;
-  border-radius: 20px;
+  border-radius: var(--radius-xs);
   background: var(--surface2);
   font-size: 0.8rem;
   cursor: pointer;
@@ -742,7 +743,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .btn-lang-opt {
   padding: 5px 12px;
   border: 2px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--surface);
   color: var(--text);
   font-family: inherit;
@@ -813,20 +814,4 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .settings-action-btn--danger { background: rgba(239,68,68,0.12); color: var(--red); }
 .settings-action-btn--link   { background: var(--surface2); color: var(--text2); }
 
-/* ==================== SYNC INDICATOR ==================== */
-.sync-indicator {
-  position: fixed;
-  bottom: 12px;
-  right: 12px;
-  font-size: 0.7rem;
-  color: #aaa;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  pointer-events: none;
-  z-index: 50;
-  opacity: 0.85;
-}
-.sync-indicator--ok    { color: var(--green); }
-.sync-indicator--error { color: var(--red); }
-.sync-indicator--syncing { color: var(--text2); }
+/* ====================
