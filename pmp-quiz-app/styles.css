@@ -841,4 +841,63 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .settings-toggle__slider::before {
   content: '';
   position: absolute;
-  width
+  width: 22px;
+  height: 22px;
+  left: 3px;
+  top: 3px;
+  background: var(--surface);
+  border-radius: 50%;
+  transition: transform var(--transition);
+  -webkit-transition: -webkit-transform var(--transition);
+  -webkit-transform: translateX(0);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.settings-toggle input:checked + .settings-toggle__slider { background: var(--accent); }
+.settings-toggle input:checked + .settings-toggle__slider::before {
+  transform: translateX(22px);
+  -webkit-transform: translateX(22px);
+}
+
+/* Action buttons inside settings */
+.settings-action-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 8px;
+  text-decoration: none;
+  transition: opacity var(--transition);
+}
+.settings-action-btn:active { opacity: 0.8; }
+.settings-action-btn--danger {
+  background: transparent;
+  color: var(--red);
+  border: 1.5px solid rgba(239,68,68,0.35);
+}
+.settings-action-btn--danger:hover {
+  background: rgba(239,68,68,0.08);
+}
+.settings-action-btn--link   { background: var(--surface2); color: var(--text2); }
+
+/* ==================== SYNC INDICATOR ==================== */
+.sync-indicator {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  font-size: 0.7rem;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.85;
+}
+.sync-indicator--ok    { color: var(--green); }
+.sync-indicator--error { color: var(--red); }
+.sync-indicator--syncing { color: var(--text2); }
