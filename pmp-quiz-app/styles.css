@@ -100,6 +100,25 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 /* ===== HOME SCREEN ===== */
 .home { display: flex; flex-direction: column; gap: 20px; }
 
+.home-topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: -8px;
+}
+.btn-settings {
+  background: var(--surface);
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--radius-xs);
+  line-height: 1;
+  box-shadow: var(--shadow);
+  transition: background var(--transition);
+}
+.btn-settings:hover { background: var(--surface2); }
+
 .streak-widget {
   background: var(--surface);
   border-radius: var(--radius);
@@ -817,17 +836,4 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .settings-action-btn {
   display: block;
   width: 100%;
-  padding: 14px 16px;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 0.95rem;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: center;
-  margin-top: 8px;
-  text-decoration: none;
-  transition: opacity var(--transition);
-}
-.settings-action-btn:active { opacity: 0.8; }
-.settings-action-btn--danger { background: rgba(239,68,68,0.12); color: var(--red); }
-.settings-action-btn--link   { background: v
+  padding: 
