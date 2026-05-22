@@ -151,7 +151,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 
 /* ===== MODE SELECT ===== */
 .mode-select { display: flex; flex-direction: column; gap: 16px; }
-.mode-select h2 { font-size: 1.3rem; font-weight: 700; }
+.mode-select h2 { font-size: 1.3rem; font-weight: 800; }
 .mode-card {
   background: var(--surface);
   border-radius: var(--radius);
@@ -377,18 +377,25 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 
 /* ===== STATS SCREEN ===== */
 .stats { display: flex; flex-direction: column; gap: 20px; }
-.stats h1 { font-size: 1.3rem; font-weight: 700; }
+.stats h1 { font-size: 1.3rem; font-weight: 800; }
 .stats-card {
   background: var(--surface);
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow);
 }
-.stats-card h3 { font-size: 0.85rem; font-weight: 600; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+.stats-card h3 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text2);
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
 .avg-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .avg-item { text-align: center; flex: 1; }
 .avg-item__val { font-size: 1.6rem; font-weight: 800; color: var(--accent); }
-.avg-item__label { font-size: 0.75rem; color: var(--text2); }
+.avg-item__label { font-size: 0.75rem; color: var(--text2); opacity: 0.75; }
 .domain-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .domain-bar__name { font-size: 0.82rem; width: 100px; flex-shrink: 0; }
 .domain-bar__track { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
@@ -397,7 +404,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .totals { display: flex; justify-content: space-around; }
 .total-item { text-align: center; }
 .total-item__val { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
-.total-item__label { font-size: 0.78rem; color: var(--text2); }
+.total-item__label { font-size: 0.78rem; color: var(--text2); opacity: 0.75; }
 .badges-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .badge-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .badge-item__emoji { font-size: 1.8rem; }
@@ -829,6 +836,4 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   color: #aaa;
   display: flex;
   align-items: center;
-  gap: 4px;
-  pointer-events: none;
-  z
+  
