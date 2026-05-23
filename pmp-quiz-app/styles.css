@@ -1032,3 +1032,12 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .sync-indicator--ok    { color: var(--green); }
 .sync-indicator--error { color: var(--red); }
 .sync-indicator--syncing { color: var(--text2); }
+
+.app-version {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text3, #aaa);
+  padding: 12px 0 8px;
+  opacity: 0.6;
+  letter-spacing: 0.03em;
+}

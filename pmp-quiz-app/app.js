@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-f2b097c4';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-5a0fa717';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -898,7 +898,7 @@ Views.home = {
         </div>`;
     }).join('');
 
-    const syncLabel = { idle: '', syncing: '⟳ sync…', ok: '✓ zsync.', error: '⚠ offline' }[AppState.syncStatus] || '';
+    const syncLabel = { idle: '', syncing: '⟳ sync…', ok: '', error: '⚠ offline' }[AppState.syncStatus] || '';
 
     return `
       <div class="screen home">
@@ -939,6 +939,7 @@ Views.home = {
             <span class="menu-btn__arrow">›</span>
           </button>
         </div>
+        <div class="app-version">${APP_VERSION}</div>
       </div>`;
   },
 

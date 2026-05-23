@@ -25,6 +25,15 @@ import re
 import sys
 from pathlib import Path
 
+# Wymuś UTF-8 na stdout/stderr — polska konsola Windows (cp1250/cp852) nie
+# potrafi wypisać znaków ✓/✅ i rzuca UnicodeEncodeError, przez co skrypt
+# kończy z kodem != 0 (objaw: migający czerwony tekst w DEPLOY.ps1).
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding='utf-8')
+    except (AttributeError, ValueError):
+        pass
+
 ROOT = Path(__file__).parent.parent / 'pmp-quiz-app'
 
 # Pliki, do których wstrzykujemy APP_VERSION.
