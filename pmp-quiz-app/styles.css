@@ -1214,5 +1214,12 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .trial-review__none { color: var(--text2); font-style: italic; }
 .trial-review__expl { font-size: 0.85rem; color: var(--text2); line-height: 1.6; margin-top: 10px; }
 
-/* --- Modal wznowienia egzaminu --- */
+/* --- Przegląd ukryty do czasu kliknięcia „Zobacz odpowiedzi" --- */
+.trial-show-answers { width: 100%; }
+.trial-answers.hidden { display: none; }
+
+/* --- Modal wznowienia / potwierdzenia egzaminu --- */
 .trial-resume__sub { font-size: 0.9rem; color: var(--text2); line-height: 1.5; margin: 4px 0 4px; }
+.trial-confirm__msg { font-size: 0.95rem; line-height: 1.5; color: var(--text); margin: 4px 0 8px; text-align: center; }
+.trial-confirm__danger { background: var(--red); }
+.trial-confirm__danger:active { background: var(--red); filter: brightness(0.92); }

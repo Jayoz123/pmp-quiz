@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-34c21d7b';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-ed9154cc';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -206,6 +206,8 @@ const I18N = {
   trial_result_title:     { pl: 'Wynik egzaminu',                   en: 'Exam result' },
   trial_rating_disclaimer:{ pl: 'Progi orientacyjne — prawdziwy egzamin używa analizy psychometrycznej.', en: 'Approximate thresholds — the real exam uses psychometric scoring.' },
   trial_new_exam:         { pl: 'Nowy egzamin',                     en: 'New exam' },
+  trial_show_answers:     { pl: 'Zobacz odpowiedzi',                en: 'See answers' },
+  trial_hide_answers:     { pl: 'Ukryj odpowiedzi',                 en: 'Hide answers' },
   trial_review_title:     { pl: 'Przegląd pytań',                   en: 'Question review' },
   trial_domains_title:    { pl: 'Wyniki per domena',                en: 'Results per domain' },
   trial_unanswered:       { pl: '— brak odpowiedzi —',              en: '— no answer —' },
@@ -1585,15 +1587,46 @@ Views.trial = {
     const s = AppState.quizSession;
     const unanswered = s.answers.filter(a => a === null).length;
     const flagged    = s.flags.filter(Boolean).length;
-    if (confirm(t('trial_confirm', { un: unanswered, fl: flagged }))) this._finish(false);
+    this._openConfirm({
+      message: t('trial_confirm', { un: unanswered, fl: flagged }),
+      confirmLabel: t('trial_finish'),
+      onConfirm: () => this._finish(false),
+    });
   },
 
   _abandon() {
-    if (!confirm(t('trial_abandon_confirm'))) return;
-    this._stopTimer();
-    AppState.quizSession = null;
-    Storage.clearTrialSession();
-    App.navigate('home');
+    this._openConfirm({
+      message: t('trial_abandon_confirm'),
+      confirmLabel: t('trial_abandon'),
+      danger: true,
+      onConfirm: () => {
+        this._stopTimer();
+        AppState.quizSession = null;
+        Storage.clearTrialSession();
+        App.navigate('home');
+      },
+    });
+  },
+
+  // Natywny (in-app) modal potwierdzenia — zamiast systemowego confirm().
+  _openConfirm({ message, confirmLabel, cancelLabel, danger, onConfirm }) {
+    document.getElementById('trial-confirm-modal')?.remove();
+    const el = document.createElement('div');
+    el.id = 'trial-confirm-modal';
+    el.className = 'settings-modal';
+    el.innerHTML = `
+      <div class="settings-modal__card" role="dialog" aria-modal="true">
+        <p class="trial-confirm__msg">${message}</p>
+        <div class="summary__actions" style="margin-top:8px">
+          <button class="btn-secondary" id="trial-confirm-cancel">${cancelLabel || t('cancel')}</button>
+          <button class="btn-primary${danger ? ' trial-confirm__danger' : ''}" style="flex:1" id="trial-confirm-ok">${confirmLabel}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    const close = () => el.remove();
+    el.querySelector('#trial-confirm-cancel').onclick = close;
+    el.querySelector('#trial-confirm-ok').onclick = () => { close(); onConfirm(); };
+    el.addEventListener('click', e => { if (e.target === el) close(); });
   },
 
   _finish(timedOut) {
@@ -1727,13 +1760,17 @@ Views['trial-result'] = {
         <p class="trial-result__disclaimer">${t('trial_rating_disclaimer')}</p>
         <div class="trial-result__time">${t('trial_time_used')}: <strong>${fmtHMS(usedSec)}</strong> ${t('trial_time_of')} ${fmtHMS(r.durationSec)}</div>
         ${domainBars ? `<div class="stats-card"><h3>${t('trial_domains_title')}</h3>${domainBars}</div>` : ''}
-        <div class="stats-card">
-          <h3>${t('trial_review_title')}</h3>
-          <div class="trial-review">${reviewItems}</div>
-        </div>
         <div class="summary__actions">
           <button class="btn-secondary" onclick="App.navigate('home')">${t('back_to_menu')}</button>
           <button class="btn-primary" style="flex:1" onclick="App.navigate('trial-setup')">${t('trial_new_exam')}</button>
+        </div>
+        <button class="btn-secondary trial-show-answers" id="trial-show-answers"
+                onclick="Views['trial-result']._toggleAnswers()">${t('trial_show_answers')}</button>
+        <div id="trial-answers" class="trial-answers hidden">
+          <div class="stats-card">
+            <h3>${t('trial_review_title')}</h3>
+            <div class="trial-review">${reviewItems}</div>
+          </div>
         </div>
       </div>`;
   },
@@ -1741,6 +1778,17 @@ Views['trial-result'] = {
   _report(i) {
     const r = AppState.trialResult;
     if (r && r.review[i]) ReportModal.open(r.review[i].q);
+  },
+
+  // Przegląd pytań jest domyślnie ukryty (plan UX) — odsłaniany przyciskiem.
+  _toggleAnswers() {
+    const box = document.getElementById('trial-answers');
+    const btn = document.getElementById('trial-show-answers');
+    if (!box) return;
+    const show = box.classList.contains('hidden');
+    box.classList.toggle('hidden', !show);
+    if (btn) btn.textContent = show ? t('trial_hide_answers') : t('trial_show_answers');
+    if (show) requestAnimationFrame(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   },
 
   // Jeden przełącznik dla testerów — przerysowuje cały przegląd w drugim języku.
