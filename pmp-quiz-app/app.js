@@ -1176,15 +1176,19 @@ Views.quiz = {
     return `
       <div class="screen quiz">
         <div class="quiz-header">
-          <button class="quiz-abandon" onclick="Views.quiz._abandon()" title="${t('back_to_menu')}">✕</button>
+          <div class="quiz-header__left">
+            <button class="quiz-abandon" onclick="Views.quiz._abandon()" title="${t('back_to_menu')}">✕</button>
+            ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
+          </div>
           <span class="quiz-counter">${session.current + 1} / ${total}</span>
-          ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
-          ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>` : ''}
+          <div class="quiz-header__right">
+            ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>` : ''}
+            ${langToggle}
+          </div>
         </div>
         <div class="quiz-progress">
           <div class="quiz-progress__bar" style="width:${pct}%"></div>
         </div>
-        ${langToggle}
         <div class="quiz-question">${questionText}</div>
         <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
         <div id="explanation-panel" class="hidden"></div>

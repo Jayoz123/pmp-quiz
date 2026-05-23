@@ -319,11 +319,20 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 /* ===== QUIZ SCREEN ===== */
 .quiz { display: flex; flex-direction: column; gap: 16px; min-height: 100vh; }
 .quiz-header {
-  display: grid;
-  grid-template-columns: 40px 1fr 40px;
+  display: flex;
   align-items: center;
   gap: 8px;
 }
+.quiz-header__left,
+.quiz-header__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.quiz-header__left  { justify-content: flex-start; }
+.quiz-header__right { justify-content: flex-end; }
 .quiz-abandon {
   font-size: 1rem;
   color: var(--text2);
@@ -331,7 +340,6 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   border-radius: var(--radius-xs);
   line-height: 1;
   flex-shrink: 0;
-  justify-self: start;
   transition: color var(--transition), background var(--transition);
 }
 .quiz-abandon:hover { color: var(--text); background: var(--surface2); }
@@ -341,6 +349,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   color: var(--text);
   white-space: nowrap;
   text-align: center;
+  flex-shrink: 0;
 }
 .quiz-header-actions {
   display: flex;
@@ -360,7 +369,25 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   border-radius: 20px;
   background: var(--accent-light);
   color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  min-width: 0;
 }
+.btn-lang-toggle {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  opacity: 0.85;
+  flex-shrink: 0;
+  transition: opacity var(--transition), background var(--transition);
+}
+.btn-lang-toggle:hover { opacity: 1; background: var(--surface2); }
 .quiz-progress {
   height: 5px;
   background: var(--surface2);
@@ -639,7 +666,6 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 
 /* ===== QUIZ REPORT BUTTON ===== */
 .quiz-report-btn {
-  margin-left: auto;
   background: none;
   border: none;
   font-size: 1.1rem;
