@@ -896,10 +896,13 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
-.settings-row__icon { font-size: 1.4rem; line-height: 1; }
+.settings-row__icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
 .settings-row__label { font-weight: 500; font-size: 0.95rem; }
 .settings-row__desc  { font-size: 0.78rem; color: var(--text2); margin-top: 2px; }
+.settings-row__info > div { min-width: 0; }
 .settings-separator  { height: 1px; background: var(--border); margin: 14px 0; }
 
 /* Language switch (PL/EN) inside settings */
