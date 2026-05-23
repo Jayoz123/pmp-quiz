@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-ed9154cc';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-3cab6909';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -107,6 +107,8 @@ const I18N = {
   streak_keep:        { pl: '🔥 Nie zatrzymuj się!',             en: '🔥 Keep it going!' },
   streak_fire:        { pl: '🔥 Tydzień ognia!',                 en: "🔥 You're on Fire! 🔥" },
   streak_many:        { pl: '🔥 {n} dni z rzędu',               en: '🔥 {n} days in a row' },
+  streak_unit_one:    { pl: 'dzień',                            en: 'day' },
+  streak_unit_many:   { pl: 'dni',                              en: 'days' },
   daily_challenge:    { pl: 'Codzienne Wyzwanie',               en: 'Daily Challenge' },
   daily_done:         { pl: '30 pytań · Ukończono dziś ✓',      en: '30 questions · Done today ✓' },
   daily_pending:      { pl: '30 pytań · Wymagane dziś',         en: '30 questions · Required today' },
@@ -1101,6 +1103,8 @@ Views.home = {
       : streak <= 6  ? t('streak_keep')
       : t('streak_fire');
 
+    const streakUnit = streak === 1 ? t('streak_unit_one') : t('streak_unit_many');
+
     const dayCells = weekDays.map(d => {
       const classes = [
         'streak-day',
@@ -1125,20 +1129,24 @@ Views.home = {
         ${syncLabel ? `<div class="sync-indicator sync-indicator--${AppState.syncStatus}">${syncLabel}</div>` : ''}
         <div id="pwa-install-banner"></div>
         <div class="streak-widget">
+          <div class="streak-count">
+            <span class="streak-count__num">${streak}</span>
+            <span class="streak-count__unit">${streakUnit}</span>
+          </div>
           <div class="streak-week">${dayCells}</div>
           <hr class="streak-divider">
           <div class="streak-message">${streakLabel}</div>
-        </div>
-        <div class="menu">
           <button class="menu-btn menu-btn--daily ${dailyDone ? 'done' : 'pending'}"
-                  onclick="App.navigate('daily-start')">
+                  ${dailyDone ? 'disabled aria-disabled="true"' : `onclick="App.navigate('daily-start')"`}>
             <span class="menu-btn__icon">${dailyDone ? '✅' : '🔴'}</span>
             <div class="menu-btn__content">
               <div class="menu-btn__title">${t('daily_challenge')}</div>
               <div class="menu-btn__sub">${dailyDone ? t('daily_done') : t('daily_pending')}</div>
             </div>
-            <span class="menu-btn__arrow">›</span>
+            ${dailyDone ? '' : '<span class="menu-btn__arrow">›</span>'}
           </button>
+        </div>
+        <div class="menu">
           <button class="menu-btn" onclick="App.navigate('mode-select')">
             <span class="menu-btn__icon">⚡</span>
             <div class="menu-btn__content">

@@ -212,6 +212,24 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   color: var(--text);
 }
 
+/* Licznik serii — duża liczba nad paskiem tygodnia */
+.streak-count {
+  text-align: center;
+  margin-bottom: 14px;
+  line-height: 1;
+}
+.streak-count__num {
+  font-size: 2.3rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+.streak-count__unit {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text2);
+  margin-left: 4px;
+}
+
 /* ---- Legacy 30-day dots (StatsView) ---- */
 .streak-dots {
   display: grid;
@@ -249,6 +267,25 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .menu-btn__arrow { font-size: 1.4rem; color: var(--text2); }
 .menu-btn--daily.pending .menu-btn__icon { animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Codzienne Wyzwanie żyje teraz wewnątrz widgetu serii */
+.streak-widget .menu-btn--daily {
+  margin-top: 14px;
+  box-shadow: none;
+}
+/* Aktywne (do zrobienia dziś) — wyraźny akcent CTA */
+.streak-widget .menu-btn--daily.pending {
+  background: var(--accent-light);
+}
+/* Ukończone dziś — wyszarzone, nieaktywne (nie myli już użytkownika) */
+.streak-widget .menu-btn--daily.done {
+  background: var(--surface2);
+  opacity: 0.55;
+  cursor: default;
+}
+.menu-btn--daily.done:active { transform: none; }
+.menu-btn--daily.done .menu-btn__title,
+.menu-btn--daily.done .menu-btn__sub { color: var(--text2); }
 
 /* ===== MODE SELECT ===== */
 .mode-select { display: flex; flex-direction: column; gap: 16px; }
