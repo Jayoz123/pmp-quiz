@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-2cc7dd5a';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-80d0781f';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -20,6 +20,24 @@ const QUIZ_SIZES   = { daily: 30, quick: 10, weak: 10 };
 const SRS_COOLDOWN = 15; // min questions before re-showing the same weak question
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
+// ==================== TRIAL EXAM (plan 12) ====================
+// Prawdziwy egzamin PMP: 230 min / 180 pyt ≈ 1.2778 min/pyt — skalujemy proporcjonalnie.
+// Gdy wejdzie nowa wersja egzaminu (od 9 lipca 2026) wystarczy zmienić minutes wariantu 'full' na 240.
+const TRIAL_VARIANTS = [
+  { id: 'full',  questions: 180, minutes: 230 },
+  { id: 'half',  questions: 90,  minutes: 115 },
+  { id: 'short', questions: 60,  minutes: 77  },
+];
+const trialVariant = id => TRIAL_VARIANTS.find(v => v.id === id) || TRIAL_VARIANTS[0];
+
+// Rating orientacyjny — PMI używa analizy psychometrycznej, więc to przybliżenie.
+function trialRating(percent) {
+  if (percent >= 80) return 'above';   // Above Target
+  if (percent >= 65) return 'target';  // Target (umowny próg „zaliczenia")
+  if (percent >= 50) return 'below';   // Below Target
+  return 'needs';                       // Needs Improvement
+}
+
 const BADGES_DEF = [
   { id: 'first',   emoji: '🎯', name: 'Pierwszy krok', name_en: 'First step',    desc: 'Ukończ pierwszy quiz',           desc_en: 'Complete your first quiz',        check: s => s.totalQuizzes >= 1 },
   { id: 'week',    emoji: '🔥', name: 'Tydzień ognia', name_en: 'Week of fire',  desc: '7 dni serii z rzędu',             desc_en: '7-day streak in a row',           check: s => s.currentStreak >= 7 },
@@ -28,6 +46,11 @@ const BADGES_DEF = [
   { id: 'fivehun', emoji: '🏆', name: 'Pięćsetka',     name_en: 'Five hundred',  desc: '500 odpowiedzianych pytań',       desc_en: '500 questions answered',          check: s => s.totalAnswered >= 500 },
   { id: 'perfect', emoji: '⭐', name: 'Perfekcja',     name_en: 'Perfection',    desc: '100% poprawnych w jednym quizie', desc_en: '100% correct in a single quiz',   check: s => s.hadPerfectQuiz },
   { id: 'ready',   emoji: '🎓', name: 'PMP Ready',     name_en: 'PMP Ready',     desc: 'Średnia ≥ 80% z 30 dni',          desc_en: 'Average ≥ 80% over 30 days',      check: s => s.avg30 >= 80 },
+  // Trial Exam (plan 12) — 🎬 zamiast 🎓 by nie dublować emoji z odznaką 'ready'.
+  { id: 'trial_first',    emoji: '🎬', name: 'Próba generalna', name_en: 'Dress Rehearsal', desc: 'Ukończ pierwszy Trial Exam',                desc_en: 'Complete your first Trial Exam',              check: s => s.trialCount >= 1 },
+  { id: 'trial_marathon', emoji: '📝', name: 'Maraton PMP',     name_en: 'PMP Marathon',    desc: 'Ukończ pełny egzamin 180 pytań',            desc_en: 'Complete a full 180-question exam',           check: s => s.trialFullDone },
+  { id: 'trial_target',   emoji: '🏅', name: 'Powyżej celu',    name_en: 'Above Target',    desc: 'Wynik ≥ 80% w Trial Exam',                  desc_en: 'Score ≥ 80% in a Trial Exam',                 check: s => s.trialBest >= 80 },
+  { id: 'trial_clock',    emoji: '⏱️', name: 'Mistrz czasu',     name_en: 'Time Master',     desc: 'Ukończ Trial Exam z ≥ 25% czasu w zapasie', desc_en: 'Finish a Trial Exam with ≥ 25% time to spare', check: s => s.trialBeatClock },
 ];
 
 const QUOTES = [
@@ -157,6 +180,41 @@ const I18N = {
   per_domain:         { pl: 'Per domena',                       en: 'Per domain' },
   activity_30:        { pl: 'Aktywność (30 dni)',               en: 'Activity (30 days)' },
   badges:             { pl: 'Odznaki',                          en: 'Badges' },
+  // trial exam (plan 12)
+  trial_title:            { pl: 'Trial Exam',                       en: 'Trial Exam' },
+  trial_menu_sub:         { pl: 'Symulacja egzaminu PMP na czas',   en: 'Timed PMP exam simulation' },
+  trial_intro:            { pl: 'Wybierz długość. Czas i nawigacja jak na prawdziwym egzaminie. Wynik na końcu.', en: 'Pick a length. Timed, with exam-style navigation. Score at the end.' },
+  trial_questions:        { pl: 'pytań',                            en: 'questions' },
+  trial_min:              { pl: 'min',                              en: 'min' },
+  trial_start:            { pl: 'Rozpocznij egzamin',               en: 'Start exam' },
+  trial_not_enough:       { pl: 'Za mało pytań w puli dla tej długości.', en: 'Not enough questions in the pool for this length.' },
+  trial_prev:             { pl: '‹ Poprzednie',                     en: '‹ Previous' },
+  trial_next:             { pl: 'Dalej ›',                          en: 'Next ›' },
+  trial_finish:           { pl: 'Zakończ egzamin',                  en: 'Finish exam' },
+  trial_flag:             { pl: 'Oznacz do przeglądu',              en: 'Flag for review' },
+  trial_palette:          { pl: 'Pytania',                          en: 'Questions' },
+  trial_abandon:          { pl: 'Przerwij egzamin',                 en: 'Abandon exam' },
+  trial_abandon_confirm:  { pl: 'Przerwać egzamin? Postęp przepadnie.', en: 'Abandon the exam? Progress will be lost.' },
+  trial_confirm:          { pl: 'Zakończyć? Bez odpowiedzi: {un}, oflagowane: {fl}.', en: 'Finish? Unanswered: {un}, flagged: {fl}.' },
+  trial_resume_title:     { pl: 'Masz niedokończony egzamin',       en: 'You have an unfinished exam' },
+  trial_resume_sub:       { pl: 'Wznów tam, gdzie skończyłeś, albo zacznij od nowa.', en: 'Resume where you left off, or start over.' },
+  trial_resume:           { pl: 'Wznów',                            en: 'Resume' },
+  trial_discard:          { pl: 'Porzuć',                           en: 'Discard' },
+  trial_timed_out:        { pl: '⏰ Czas minął — egzamin zakończony automatycznie', en: "⏰ Time's up — exam submitted automatically" },
+  trial_time_used:        { pl: 'Czas',                             en: 'Time' },
+  trial_time_of:          { pl: 'z',                                en: 'of' },
+  trial_result_title:     { pl: 'Wynik egzaminu',                   en: 'Exam result' },
+  trial_rating_disclaimer:{ pl: 'Progi orientacyjne — prawdziwy egzamin używa analizy psychometrycznej.', en: 'Approximate thresholds — the real exam uses psychometric scoring.' },
+  trial_new_exam:         { pl: 'Nowy egzamin',                     en: 'New exam' },
+  trial_review_title:     { pl: 'Przegląd pytań',                   en: 'Question review' },
+  trial_domains_title:    { pl: 'Wyniki per domena',                en: 'Results per domain' },
+  trial_unanswered:       { pl: '— brak odpowiedzi —',              en: '— no answer —' },
+  rating_above:           { pl: 'Powyżej celu',                     en: 'Above Target' },
+  rating_target:          { pl: 'Cel osiągnięty',                   en: 'Target' },
+  rating_below:           { pl: 'Poniżej celu',                     en: 'Below Target' },
+  rating_needs:           { pl: 'Wymaga poprawy',                   en: 'Needs Improvement' },
+  your_answer:            { pl: 'Twoja odpowiedź',                  en: 'Your answer' },
+  correct_answer:         { pl: 'Poprawna odpowiedź',              en: 'Correct answer' },
 };
 
 function t(key, vars) {
@@ -204,6 +262,10 @@ const Storage = {
     return this.getHistory().length > 0
         || Object.keys(this.getStreakData()).length > 0;
   },
+  // Trial Exam — sesja egzaminu przeżywa reload/PWA dzięki localStorage (plan 12, sekcja 3a).
+  getTrialSession()   { return this._get('trial_session', null); },
+  saveTrialSession(s) { this._set('trial_session', s); },
+  clearTrialSession() { try { localStorage.removeItem('trial_session'); } catch {} },
 };
 
 // ==================== SUPABASE SYNC ====================
@@ -309,18 +371,25 @@ const SupabaseSync = {
     } catch (e) { console.warn('pushProgress failed:', e); }
   },
 
-  async saveQuizSession({ mode, correct, total, percent, domainResults }) {
+  async saveQuizSession({ mode, correct, total, percent, domainResults, examLength, durationSec, timeLeftSec, rating }) {
     try {
       const { data: { user } } = await sb().auth.getUser();
       if (!user) return;
-      await sb().from('quiz_sessions').insert({
+      const row = {
         user_id: user.id,
         mode,
         score:   correct,
         total,
         percent,
         domains: domainResults || [],
-      });
+      };
+      // Pola egzaminu Trial — wymagają migracji 12_trial_exam.sql; wysyłane tylko
+      // gdy podane (tryby quiz/daily/quick/weak ich nie dosyłają).
+      if (examLength  !== undefined) row.exam_length   = examLength;
+      if (durationSec !== undefined) row.duration_sec  = durationSec;
+      if (timeLeftSec !== undefined) row.time_left_sec = timeLeftSec;
+      if (rating      !== undefined) row.rating        = rating;
+      await sb().from('quiz_sessions').insert(row);
     } catch (e) { console.warn('saveQuizSession failed:', e); }
   },
 
@@ -540,6 +609,11 @@ const QuizEngine = {
     }
     Storage.saveWeakQuestions(wq);
   },
+
+  // Trial Exam — losowo z całej puli, bez powtórzeń (plan 12, sekcja 4).
+  selectTrialQuestions(allQuestions, n) {
+    return this.shuffle([...allQuestions]).slice(0, n);
+  },
 };
 
 // ==================== STREAK MANAGER ====================
@@ -632,7 +706,15 @@ const BadgeManager = {
     const avg30  = last30.length
       ? Math.round(last30.reduce((s, r) => s + r.percent, 0) / last30.length) : 0;
     const hadPerfectQuiz = history.some(r => r.percent === 100);
-    return { totalAnswered, totalQuizzes, currentStreak, avg30, hadPerfectQuiz };
+    // Trial Exam (plan 12) — pola wyliczane z historii (filtr mode === 'trial')
+    const trials = history.filter(r => r.mode === 'trial');
+    const trialCount     = trials.length;
+    const trialFullDone  = trials.some(r => r.examLength === 180);
+    const trialBest      = trials.reduce((m, r) => Math.max(m, r.percent || 0), 0);
+    const trialBeatClock = trials.some(r =>
+      r.durationSec && r.timeLeftSec >= r.durationSec * 0.25);
+    return { totalAnswered, totalQuizzes, currentStreak, avg30, hadPerfectQuiz,
+             trialCount, trialFullDone, trialBest, trialBeatClock };
   },
   checkAndUnlock() {
     const stats   = this.buildStats();
@@ -678,6 +760,7 @@ const AppState = {
   questions:    [],
   quizSession:  null,   // { questions, current, answers, mode, shuffledMap, recentlyShown }
   lastSummary:  null,   // { correct, total, percent, bestStreak, weakestDomain, streakExtended, mode }
+  trialResult:  null,   // { ...result, review } — wynik ostatniego Trial Exam (plan 12)
   pendingMode:  null,
   pendingDomains: [],
   showEnglish:  false,  // EN/PL toggle state
@@ -688,6 +771,117 @@ const AppState = {
   sessionKickedMsg: null, // set when SessionGuard kicks this device; shown once on the login screen
 };
 
+// ==================== REPORT MODAL (shared by quiz / trial / trial-result) ====================
+// Wspólny helper zgłaszania błędów — używany przez Views.quiz, Views.trial i
+// Views['trial-result']. Pytanie podajemy jawnie przez open(question).
+const ReportModal = {
+  _q: null,
+
+  open(question) {
+    if (!question) return;
+    this._q = question;
+    document.getElementById('report-modal')?.remove();
+    const q = question;
+
+    const categories = [
+      { id: 'wrong_answer',  label: t('cat_wrong_answer') },
+      { id: 'unclear',       label: t('cat_unclear') },
+      { id: 'typo',          label: t('cat_typo') },
+      { id: 'translation',   label: t('cat_translation') },
+      { id: 'other',         label: t('cat_other') },
+    ];
+    const chips = categories.map(c => `
+      <button type="button" class="report-chip" data-cat="${c.id}"
+              onclick="ReportModal._selectCat('${c.id}')">
+        ${c.label}
+      </button>`).join('');
+    const preview = (() => {
+      const txt = (AppState.showEnglish && q.question_en) ? q.question_en : q.question;
+      return txt.slice(0, 100) + (txt.length > 100 ? '…' : '');
+    })();
+
+    const modal = document.createElement('div');
+    modal.id = 'report-modal';
+    modal.className = 'report-modal';
+    modal.innerHTML = `
+      <div class="report-modal__card" role="dialog" aria-modal="true" aria-label="${t('report_aria')}">
+        <div class="report-modal__header">
+          <span>${t('report_header')}</span>
+          <button class="report-modal__close" onclick="ReportModal.close()" aria-label="${t('close')}">✕</button>
+        </div>
+        <p class="report-modal__question-preview">"${preview}"</p>
+        <div class="report-modal__cats" id="report-cats">${chips}</div>
+        <textarea id="report-comment" class="report-modal__textarea"
+                  placeholder="${t('report_comment_ph')}"
+                  maxlength="500" rows="3"></textarea>
+        <div id="report-modal-msg" class="report-modal__msg hidden"></div>
+        <div class="report-modal__actions">
+          <button class="btn-secondary" onclick="ReportModal.close()">${t('cancel')}</button>
+          <button class="btn-primary" id="report-submit-btn"
+                  onclick="ReportModal._submit()" disabled>${t('send_report')}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) ReportModal.close(); });
+  },
+
+  _selectCat(catId) {
+    document.querySelectorAll('.report-chip').forEach(el => {
+      el.classList.toggle('selected', el.dataset.cat === catId);
+    });
+    const btn = document.getElementById('report-submit-btn');
+    if (btn) btn.disabled = false;
+  },
+
+  close() {
+    document.getElementById('report-modal')?.remove();
+  },
+
+  async _submit() {
+    const q = this._q;
+    if (!q) return;
+    const catEl     = document.querySelector('.report-chip.selected');
+    const comment   = document.getElementById('report-comment')?.value.trim();
+    const msgEl     = document.getElementById('report-modal-msg');
+    const submitBtn = document.getElementById('report-submit-btn');
+    if (!catEl) return;
+
+    submitBtn.disabled    = true;
+    submitBtn.textContent = '…';
+    try {
+      await SupabaseSync.reportQuestion({
+        questionId:   q.id,
+        questionText: q.question,
+        category:     catEl.dataset.cat,
+        comment,
+      });
+      this.close();
+      this.toast(t('report_sent'), true);
+    } catch (e) {
+      if (msgEl) {
+        msgEl.textContent = t('report_send_err');
+        msgEl.className   = 'report-modal__msg report-modal__msg--err';
+      }
+      submitBtn.disabled    = false;
+      submitBtn.textContent = t('send_report');
+    }
+  },
+
+  toast(msg, success = true) {
+    document.getElementById('quiz-toast')?.remove();
+    const toast = document.createElement('div');
+    toast.id        = 'quiz-toast';
+    toast.className = `quiz-toast ${success ? 'quiz-toast--ok' : 'quiz-toast--err'}`;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('visible'));
+    setTimeout(() => {
+      toast.classList.remove('visible');
+      setTimeout(() => toast.remove(), 400);
+    }, 3000);
+  },
+};
+
 // ==================== VIEWS ====================
 const Views = {};
 
@@ -696,6 +890,8 @@ const App = {
   currentView: 'loading',
 
   navigate(view, params = {}) {
+    // Sprzątanie timera egzaminu przy opuszczaniu widoku 'trial' (plan 12, sekcja 15).
+    if (this.currentView === 'trial' && view !== 'trial') Views.trial?._stopTimer();
     Object.assign(AppState, params);
     this.currentView = view;
     this.render();
@@ -748,6 +944,25 @@ const App = {
     // Initialize EN/PL state from saved global language preference
     AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
     await new Promise(r => setTimeout(r, 800));
+
+    // Trial Exam — wykrycie niedokończonej sesji egzaminu (plan 12, sekcja 3a).
+    const trial = Storage.getTrialSession();
+    if (trial && trial.mode === 'trial' && Array.isArray(trial.questions) && trial.questions.length) {
+      AppState.quizSession = trial;
+      if (trial.endsAt <= Date.now()) {
+        // Egzamin wygasł w tle → auto-finalizacja z timedOut=true.
+        this.navigate('home');
+        SessionGuard.startHeartbeat();
+        Views.trial._finish(true);   // nawiguje do trial-result
+        return;
+      }
+      // Wciąż ważny → zaproponuj wznowienie.
+      this.navigate('home');
+      SessionGuard.startHeartbeat();
+      Views.home._promptTrialResume();
+      return;
+    }
+
     this.navigate('home');
     SessionGuard.startHeartbeat();
   },
@@ -930,6 +1145,14 @@ Views.home = {
             </div>
             <span class="menu-btn__arrow">›</span>
           </button>
+          <button class="menu-btn" onclick="App.navigate('trial-setup')">
+            <span class="menu-btn__icon">📝</span>
+            <div class="menu-btn__content">
+              <div class="menu-btn__title">${t('trial_title')}</div>
+              <div class="menu-btn__sub">${t('trial_menu_sub')}</div>
+            </div>
+            <span class="menu-btn__arrow">›</span>
+          </button>
           <button class="menu-btn" onclick="App.navigate('stats')">
             <span class="menu-btn__icon">📊</span>
             <div class="menu-btn__content">
@@ -1026,6 +1249,33 @@ Views.home = {
     SessionGuard.clearLocalToken();
     await Auth.signOut();
     App.navigate('login');
+  },
+
+  // ---- Trial Exam — modal wznowienia niedokończonego egzaminu (plan 12) ----
+  _promptTrialResume() {
+    document.getElementById('trial-resume-modal')?.remove();
+    const el = document.createElement('div');
+    el.id = 'trial-resume-modal';
+    el.className = 'settings-modal';
+    el.innerHTML = `
+      <div class="settings-modal__card" role="dialog" aria-modal="true" aria-label="${t('trial_resume_title')}">
+        <div class="settings-modal__header"><span>${t('trial_resume_title')}</span></div>
+        <p class="trial-resume__sub">${t('trial_resume_sub')}</p>
+        <div class="summary__actions" style="margin-top:8px">
+          <button class="btn-secondary" onclick="Views.home._discardTrialResume()">${t('trial_discard')}</button>
+          <button class="btn-primary" style="flex:1" onclick="Views.home._doTrialResume()">${t('trial_resume')}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+  },
+  _doTrialResume() {
+    document.getElementById('trial-resume-modal')?.remove();
+    App.navigate('trial');
+  },
+  _discardTrialResume() {
+    document.getElementById('trial-resume-modal')?.remove();
+    AppState.quizSession = null;
+    Storage.clearTrialSession();
   },
 
   init() {
@@ -1136,6 +1386,378 @@ Views['daily-start'] = {
     const questions = QuizEngine.selectQuestions(AppState.questions, 'daily');
     AppState.quizSession = { questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [], currentAnswer: null };
     App.navigate('quiz');
+  },
+};
+
+// ==================== TRIAL EXAM (plan 12) ====================
+// Format H:MM:SS (lub MM:SS gdy < 1h) — używany na ekranie wyników egzaminu.
+function fmtHMS(totalSec) {
+  totalSec = Math.max(0, Math.round(totalSec));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+// ---- Widok wyboru długości egzaminu ----
+Views['trial-setup'] = {
+  _variant: 'full',
+
+  render() {
+    const cards = TRIAL_VARIANTS.map(v => `
+      <div class="trial-variant ${this._variant === v.id ? 'selected' : ''}"
+           onclick="Views['trial-setup']._pick('${v.id}')">
+        <div class="trial-variant__q">${v.questions}</div>
+        <div class="trial-variant__label">${t('trial_questions')}</div>
+        <div class="trial-variant__time">⏱ ${v.minutes} ${t('trial_min')}</div>
+      </div>`).join('');
+    return `
+      <div class="screen trial-setup">
+        <button class="btn-back" onclick="App.navigate('home')">${t('back')}</button>
+        <h2>${t('trial_title')}</h2>
+        <p class="trial-intro">${t('trial_intro')}</p>
+        <div class="trial-variants">${cards}</div>
+        <button class="btn-primary" onclick="Views['trial-setup']._start()">${t('trial_start')}</button>
+      </div>`;
+  },
+
+  _pick(id) { this._variant = id; App.render(); },
+
+  _start() {
+    const v = trialVariant(this._variant);
+    if (AppState.questions.length < v.questions) { alert(t('trial_not_enough')); return; }
+    const questions = QuizEngine.selectTrialQuestions(AppState.questions, v.questions);
+    const now = Date.now();
+    AppState.quizSession = {
+      mode: 'trial', variant: v.id, questions,
+      shuffledMap: {}, answers: Array(v.questions).fill(null),
+      flags: Array(v.questions).fill(false), current: 0,
+      startedAt: now, endsAt: now + v.minutes * 60000, durationSec: v.minutes * 60,
+    };
+    Storage.saveTrialSession(AppState.quizSession);
+    App.navigate('trial');
+  },
+
+  init() {},
+};
+
+// ---- Runner egzaminu ----
+Views.trial = {
+  _tick: null,  // uchwyt setInterval
+
+  render() {
+    const s = AppState.quizSession;
+    if (!s || s.mode !== 'trial') { App.navigate('home'); return ''; }
+    const i = s.current;
+    const q = s.questions[i];
+    if (!s.shuffledMap[i]) s.shuffledMap[i] = QuizEngine.shuffleAnswers(q);
+    const map = s.shuffledMap[i];
+    const showEn = AppState.showEnglish;
+    const hasEn  = !!(q.question_en && map.displayAnswers_en[0]);
+    const displayAnswers = (showEn && hasEn) ? map.displayAnswers_en : map.displayAnswers_pl;
+    const questionText   = (showEn && hasEn) ? q.question_en : q.question;
+    const letters = ['A', 'B', 'C', 'D'];
+    const selected = s.answers[i];
+
+    const answerBtns = displayAnswers.map((text, idx) => `
+      <button class="answer-btn ${selected === idx ? 'selected' : ''}" data-index="${idx}"
+              onclick="Views.trial._select(${idx})">
+        <span class="letter">${letters[idx]}</span><span>${text}</span>
+      </button>`).join('');
+
+    const langToggle = (hasEn && AppState.isTester) ? `
+      <button class="btn-lang-toggle" onclick="Views.trial._toggleLang()"
+              title="${showEn ? 'PL' : 'EN'}" aria-label="${showEn ? 'PL' : 'EN'}">${showEn ? '🇵🇱' : '🇬🇧'}</button>` : '';
+
+    return `
+      <div class="screen trial">
+        <div class="trial-header">
+          <button class="quiz-abandon" onclick="Views.trial._abandon()" title="${t('trial_abandon')}">✕</button>
+          <span class="trial-timer" id="trial-timer">--:--</span>
+          <div class="trial-header__right">
+            ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.trial._report()" title="${t('report_title')}">🚩</button>` : ''}
+            ${langToggle}
+            <button class="trial-flag ${s.flags[i] ? 'active' : ''}" onclick="Views.trial._toggleFlag()" title="${t('trial_flag')}">🏴</button>
+          </div>
+        </div>
+        <div class="trial-subbar">
+          <span class="trial-counter">${i + 1} / ${s.questions.length}</span>
+          ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
+          <button class="trial-palette-btn" onclick="Views.trial._togglePalette()">${t('trial_palette')}</button>
+        </div>
+        <div class="quiz-question">${questionText}</div>
+        <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
+        <div class="trial-nav">
+          <button class="btn-secondary" ${i === 0 ? 'disabled' : ''} onclick="Views.trial._prev()">${t('trial_prev')}</button>
+          ${i === s.questions.length - 1
+            ? `<button class="btn-primary" onclick="Views.trial._confirmFinish()">${t('trial_finish')}</button>`
+            : `<button class="btn-primary" onclick="Views.trial._next()">${t('trial_next')}</button>`}
+        </div>
+        <div id="trial-palette" class="trial-palette hidden"></div>
+      </div>`;
+  },
+
+  _select(idx) {
+    const s = AppState.quizSession;
+    s.answers[s.current] = idx;
+    Storage.saveTrialSession(s);
+    document.querySelectorAll('.answer-btn').forEach((b, k) =>
+      b.classList.toggle('selected', k === idx));
+  },
+
+  _toggleFlag() {
+    const s = AppState.quizSession;
+    s.flags[s.current] = !s.flags[s.current];
+    Storage.saveTrialSession(s);
+    document.querySelector('.trial-flag')?.classList.toggle('active', s.flags[s.current]);
+  },
+
+  _prev() { const s = AppState.quizSession; if (s.current > 0) { s.current--; Storage.saveTrialSession(s); App.navigate('trial'); } },
+  _next() { const s = AppState.quizSession; if (s.current < s.questions.length - 1) { s.current++; Storage.saveTrialSession(s); App.navigate('trial'); } },
+  _jump(i) { const s = AppState.quizSession; s.current = i; Storage.saveTrialSession(s); App.navigate('trial'); },
+
+  // W egzaminie nie ma panelu wyjaśnień, więc bezpiecznie przerysowujemy cały widok:
+  // wybrana odpowiedź i flaga są trzymane w sesji, więc nic nie giniemy.
+  _toggleLang() { AppState.showEnglish = !AppState.showEnglish; App.navigate('trial'); },
+
+  _report() {
+    const s = AppState.quizSession;
+    if (s) ReportModal.open(s.questions[s.current]);
+  },
+
+  // ---- Paleta pytań ----
+  _renderPalette() {
+    const s = AppState.quizSession;
+    const cells = s.questions.map((_, i) => {
+      const cls = [
+        'trial-pcell',
+        s.answers[i] !== null ? 'answered' : 'empty',
+        s.flags[i] ? 'flagged' : '',
+        i === s.current ? 'current' : '',
+      ].filter(Boolean).join(' ');
+      return `<button class="${cls}" onclick="Views.trial._jump(${i})">${i + 1}</button>`;
+    }).join('');
+    return `<div class="trial-palette__grid">${cells}</div>`;
+  },
+
+  _togglePalette(forceClose) {
+    const el = document.getElementById('trial-palette');
+    if (!el) return;
+    if (forceClose === true) { el.classList.add('hidden'); return; }
+    const willShow = el.classList.contains('hidden');
+    if (willShow) el.innerHTML = this._renderPalette();
+    el.classList.toggle('hidden');
+  },
+
+  // ---- Timer (odliczanie + auto-finalizacja) ----
+  _startTimer() {
+    this._stopTimer();          // nigdy nie stackuj interwałów
+    this._renderTime();         // natychmiastowy render
+    this._tick = setInterval(() => this._renderTime(), 1000);
+  },
+  _stopTimer() { if (this._tick) { clearInterval(this._tick); this._tick = null; } },
+  _renderTime() {
+    const s = AppState.quizSession;
+    if (!s || s.mode !== 'trial') { this._stopTimer(); return; }
+    const leftMs = s.endsAt - Date.now();
+    const el = document.getElementById('trial-timer');
+    if (leftMs <= 0) { this._stopTimer(); this._autoSubmit(); return; }
+    const sec = Math.floor(leftMs / 1000);
+    const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+    const ss = String(sec % 60).padStart(2, '0');
+    if (el) {
+      el.textContent = `${mm}:${ss}`;
+      el.classList.toggle('trial-timer--warn', leftMs <= 5 * 60000); // ostatnie 5 min
+    }
+  },
+  _autoSubmit() { this._finish(/* timedOut */ true); },
+
+  // ---- Zakończenie egzaminu ----
+  _confirmFinish() {
+    const s = AppState.quizSession;
+    const unanswered = s.answers.filter(a => a === null).length;
+    const flagged    = s.flags.filter(Boolean).length;
+    if (confirm(t('trial_confirm', { un: unanswered, fl: flagged }))) this._finish(false);
+  },
+
+  _abandon() {
+    if (!confirm(t('trial_abandon_confirm'))) return;
+    this._stopTimer();
+    AppState.quizSession = null;
+    Storage.clearTrialSession();
+    App.navigate('home');
+  },
+
+  _finish(timedOut) {
+    this._stopTimer();
+    const s = AppState.quizSession;
+    if (!s) { App.navigate('home'); return; }
+
+    let correct = 0;
+    const domainMap = {};
+    const review = [];               // pełny przegląd na ekran wyników
+    s.questions.forEach((q, i) => {
+      const map = s.shuffledMap[i] || QuizEngine.shuffleAnswers(q);
+      const sel = s.answers[i];
+      const isCorrect = sel !== null && sel === map.correctDisplayIndex;
+      if (isCorrect) correct++;
+      // egzamin zasila „moje słabe pytania" (bez confidence)
+      QuizEngine.recordAnswer(q.id, isCorrect, null);
+      if (q.domain) {
+        if (!domainMap[q.domain]) domainMap[q.domain] = { correct: 0, total: 0 };
+        domainMap[q.domain].total++;
+        if (isCorrect) domainMap[q.domain].correct++;
+      }
+      review.push({ i, q, map, sel, isCorrect, flagged: s.flags[i] });
+    });
+
+    const total   = s.questions.length;
+    const percent = Math.round((correct / total) * 100);
+    const domainResults = Object.entries(domainMap).map(([domain, d]) => ({
+      domain, percent: Math.round((d.correct / d.total) * 100),
+    }));
+    const timeLeftSec = Math.max(0, Math.round((s.endsAt - Date.now()) / 1000));
+    const rating = trialRating(percent);
+
+    const result = {
+      date: TODAY(), mode: 'trial', correct, total, percent, domainResults,
+      examLength: total, durationSec: s.durationSec, timeLeftSec, timedOut, rating,
+    };
+    Storage.saveResult(result);              // trafia do quiz_history (i sync do chmury)
+    StreakManager.markActivityDone();        // egzamin to aktywność, NIE daily
+    SupabaseSync.saveQuizSession({
+      mode: 'trial', correct, total, percent, domainResults,
+      examLength: total, durationSec: s.durationSec, timeLeftSec, rating,
+    }).catch(console.error);
+    SupabaseSync.pushProgress().catch(console.error);
+
+    AppState.trialResult = { ...result, review };
+    AppState.quizSession = null;
+    Storage.clearTrialSession();
+    App.navigate('trial-result');
+  },
+
+  init() {
+    const s = AppState.quizSession;
+    if (!s || s.mode !== 'trial') return;
+    this._startTimer();
+  },
+};
+
+// ---- Ekran wyniku egzaminu + przegląd ----
+Views['trial-result'] = {
+  render() {
+    const r = AppState.trialResult;
+    if (!r) { App.navigate('home'); return ''; }
+    const showEn = AppState.showEnglish;
+    const letters = ['A', 'B', 'C', 'D'];
+    const ratingLabel = t('rating_' + r.rating);
+    const usedSec = (r.durationSec || 0) - (r.timeLeftSec || 0);
+    const anyEn = r.review.some(it => it.q.question_en && it.map.displayAnswers_en[0]);
+
+    const langToggle = (anyEn && AppState.isTester) ? `
+      <button class="btn-lang-toggle" onclick="Views['trial-result']._toggleLang()"
+              title="${showEn ? 'PL' : 'EN'}" aria-label="${showEn ? 'PL' : 'EN'}">${showEn ? '🇵🇱' : '🇬🇧'}</button>` : '';
+
+    const domainBars = (r.domainResults || []).slice().sort((a, b) => a.percent - b.percent).map(d => `
+      <div class="domain-bar">
+        <span class="domain-bar__name">${tDomain(d.domain)}</span>
+        <div class="domain-bar__track"><div class="domain-bar__fill" style="width:0%" data-target="${d.percent}"></div></div>
+        <span class="domain-bar__pct">${d.percent}%</span>
+      </div>`).join('');
+
+    const reviewItems = r.review.map(item => {
+      const { i, q, map, sel, isCorrect, flagged } = item;
+      const hasEn = !!(q.question_en && map.displayAnswers_en[0]);
+      const useEn = showEn && hasEn;
+      const displayAnswers = useEn ? map.displayAnswers_en : map.displayAnswers_pl;
+      const qText    = useEn ? q.question_en : q.question;
+      const explText = useEn ? (q.explanation_en || q.explanation) : q.explanation;
+      const correctIdx = map.correctDisplayIndex;
+
+      const yourAnsHtml = sel === null
+        ? `<span class="trial-review__none">${t('trial_unanswered')}</span>`
+        : `<span class="trial-review__ans trial-review__ans--${isCorrect ? 'correct' : 'you'}">${isCorrect ? '✓' : '✗'} ${letters[sel]}. ${displayAnswers[sel]}</span>`;
+      const correctAnsHtml = (sel === null || !isCorrect) ? `
+        <div class="trial-review__row">
+          <span class="trial-review__lbl">${t('correct_answer')}:</span>
+          <span class="trial-review__ans trial-review__ans--correct">✓ ${letters[correctIdx]}. ${displayAnswers[correctIdx]}</span>
+        </div>` : '';
+      const reportBtn = AppState.canReportBugs
+        ? `<button class="trial-review__report" onclick="Views['trial-result']._report(${i})" title="${t('report_title')}">🚩</button>` : '';
+
+      return `
+        <div class="trial-review__item ${isCorrect ? 'is-correct' : 'is-wrong'}">
+          <div class="trial-review__head">
+            <span class="trial-review__num">${i + 1}${flagged ? ' 🏴' : ''}</span>
+            ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
+            ${reportBtn}
+          </div>
+          <div class="trial-review__q">${qText}</div>
+          <div class="trial-review__row">
+            <span class="trial-review__lbl">${t('your_answer')}:</span>
+            ${yourAnsHtml}
+          </div>
+          ${correctAnsHtml}
+          ${explText ? `<p class="trial-review__expl">${explText}</p>` : ''}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="screen trial-result">
+        <div class="trial-result__head">
+          <button class="btn-back" onclick="App.navigate('home')">${t('back')}</button>
+          ${langToggle}
+        </div>
+        <h2 class="trial-result__title">${t('trial_result_title')}</h2>
+        ${r.timedOut ? `<div class="trial-timedout">${t('trial_timed_out')}</div>` : ''}
+        <div class="trial-result__score trial-rating--${r.rating}">
+          <div class="trial-result__num">${r.correct}/${r.total}</div>
+          <div class="trial-result__pct">${r.percent}%</div>
+          <div class="trial-result__rating">${ratingLabel}</div>
+        </div>
+        <p class="trial-result__disclaimer">${t('trial_rating_disclaimer')}</p>
+        <div class="trial-result__time">${t('trial_time_used')}: <strong>${fmtHMS(usedSec)}</strong> ${t('trial_time_of')} ${fmtHMS(r.durationSec)}</div>
+        ${domainBars ? `<div class="stats-card"><h3>${t('trial_domains_title')}</h3>${domainBars}</div>` : ''}
+        <div class="stats-card">
+          <h3>${t('trial_review_title')}</h3>
+          <div class="trial-review">${reviewItems}</div>
+        </div>
+        <div class="summary__actions">
+          <button class="btn-secondary" onclick="App.navigate('home')">${t('back_to_menu')}</button>
+          <button class="btn-primary" style="flex:1" onclick="App.navigate('trial-setup')">${t('trial_new_exam')}</button>
+        </div>
+      </div>`;
+  },
+
+  _report(i) {
+    const r = AppState.trialResult;
+    if (r && r.review[i]) ReportModal.open(r.review[i].q);
+  },
+
+  // Jeden przełącznik dla testerów — przerysowuje cały przegląd w drugim języku.
+  _toggleLang() { AppState.showEnglish = !AppState.showEnglish; App.navigate('trial-result'); },
+
+  init() {
+    setTimeout(() => {
+      document.querySelectorAll('.trial-result .domain-bar__fill[data-target]').forEach(el => {
+        el.style.width = el.dataset.target + '%';
+      });
+    }, 100);
+    const r = AppState.trialResult;
+    if (!r) return;
+    // Konfetti + odznaki tylko raz na wynik (nie przy każdym przełączeniu języka).
+    if (!r._celebrated) {
+      r._celebrated = true;
+      if (r.percent >= 80) setTimeout(launchConfetti, 300);
+      const newBadges = BadgeManager.checkAndUnlock();
+      if (newBadges.length) {
+        let delay = 800;
+        newBadges.forEach(b => { setTimeout(() => showBadgePopup(b), delay); delay += 2500; });
+      }
+    }
   },
 };
 
@@ -1370,114 +1992,11 @@ Views.quiz = {
     btn.setAttribute('aria-label', newShowing === 'en' ? 'PL' : 'EN');
   },
 
-  // ---- Zgłaszanie błędów ----
+  // ---- Zgłaszanie błędów (wspólny ReportModal) ----
   _openReportModal() {
     const session = AppState.quizSession;
     if (!session) return;
-    const q = session.questions[session.current];
-
-    // Usuń poprzedni modal jeśli istnieje
-    document.getElementById('report-modal')?.remove();
-
-    const categories = [
-      { id: 'wrong_answer',  label: t('cat_wrong_answer') },
-      { id: 'unclear',       label: t('cat_unclear') },
-      { id: 'typo',          label: t('cat_typo') },
-      { id: 'translation',   label: t('cat_translation') },
-      { id: 'other',         label: t('cat_other') },
-    ];
-
-    const chips = categories.map(c => `
-      <button type="button" class="report-chip" data-cat="${c.id}"
-              onclick="Views.quiz._selectReportCat('${c.id}')">
-        ${c.label}
-      </button>`).join('');
-
-    const modal = document.createElement('div');
-    modal.id = 'report-modal';
-    modal.className = 'report-modal';
-    modal.innerHTML = `
-      <div class="report-modal__card" role="dialog" aria-modal="true" aria-label="${t('report_aria')}">
-        <div class="report-modal__header">
-          <span>${t('report_header')}</span>
-          <button class="report-modal__close" onclick="Views.quiz._closeReportModal()" aria-label="${t('close')}">✕</button>
-        </div>
-        <p class="report-modal__question-preview">"${(() => { const txt = (AppState.showEnglish && q.question_en) ? q.question_en : q.question; return txt.slice(0, 100) + (txt.length > 100 ? '…' : ''); })()}"</p>
-        <div class="report-modal__cats" id="report-cats">${chips}</div>
-        <textarea id="report-comment" class="report-modal__textarea"
-                  placeholder="${t('report_comment_ph')}"
-                  maxlength="500" rows="3"></textarea>
-        <div id="report-modal-msg" class="report-modal__msg hidden"></div>
-        <div class="report-modal__actions">
-          <button class="btn-secondary" onclick="Views.quiz._closeReportModal()">${t('cancel')}</button>
-          <button class="btn-primary" id="report-submit-btn"
-                  onclick="Views.quiz._submitReport()" disabled>${t('send_report')}</button>
-        </div>
-      </div>`;
-
-    document.body.appendChild(modal);
-    // Zamknij na klik tła
-    modal.addEventListener('click', e => { if (e.target === modal) Views.quiz._closeReportModal(); });
-  },
-
-  _selectReportCat(catId) {
-    document.querySelectorAll('.report-chip').forEach(el => {
-      el.classList.toggle('selected', el.dataset.cat === catId);
-    });
-    const btn = document.getElementById('report-submit-btn');
-    if (btn) btn.disabled = false;
-  },
-
-  _closeReportModal() {
-    document.getElementById('report-modal')?.remove();
-  },
-
-  async _submitReport() {
-    const session = AppState.quizSession;
-    if (!session) return;
-    const q        = session.questions[session.current];
-    const catEl    = document.querySelector('.report-chip.selected');
-    const comment  = document.getElementById('report-comment')?.value.trim();
-    const msgEl    = document.getElementById('report-modal-msg');
-    const submitBtn = document.getElementById('report-submit-btn');
-
-    if (!catEl) return;
-
-    submitBtn.disabled    = true;
-    submitBtn.textContent = '…';
-
-    try {
-      await SupabaseSync.reportQuestion({
-        questionId:   q.id,
-        questionText: q.question,
-        category:     catEl.dataset.cat,
-        comment,
-      });
-      this._closeReportModal();
-      Views.quiz._showToast(t('report_sent'), true);
-    } catch (e) {
-      if (msgEl) {
-        msgEl.textContent = t('report_send_err');
-        msgEl.className   = 'report-modal__msg report-modal__msg--err';
-      }
-      submitBtn.disabled    = false;
-      submitBtn.textContent = t('send_report');
-    }
-  },
-
-  _showToast(msg, success = true) {
-    const existing = document.getElementById('quiz-toast');
-    if (existing) existing.remove();
-    const toast = document.createElement('div');
-    toast.id        = 'quiz-toast';
-    toast.className = `quiz-toast ${success ? 'quiz-toast--ok' : 'quiz-toast--err'}`;
-    toast.textContent = msg;
-    document.body.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add('visible'));
-    setTimeout(() => {
-      toast.classList.remove('visible');
-      setTimeout(() => toast.remove(), 400);
-    }, 3000);
+    ReportModal.open(session.questions[session.current]);
   },
   // ---- koniec zgłaszania błędów ----
 

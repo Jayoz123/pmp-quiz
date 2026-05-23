@@ -85,9 +85,33 @@ const QuizEngine = {
     }
     Storage.saveWeakQuestions(wq);
   },
+  selectTrialQuestions(allQuestions, n) { return this.shuffle([...allQuestions]).slice(0, n); },
 };
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
+
+// ===== TRIAL EXAM (plan 12) — mirror app.js =====
+const TRIAL_VARIANTS = [
+  { id: 'full',  questions: 180, minutes: 230 },
+  { id: 'half',  questions: 90,  minutes: 115 },
+  { id: 'short', questions: 60,  minutes: 77  },
+];
+const trialVariant = id => TRIAL_VARIANTS.find(v => v.id === id) || TRIAL_VARIANTS[0];
+function trialRating(percent) {
+  if (percent >= 80) return 'above';
+  if (percent >= 65) return 'target';
+  if (percent >= 50) return 'below';
+  return 'needs';
+}
+// Mirror rdzenia scoringu z Views.trial._finish (unanswered = błędne)
+function scoreTrial(answers, correctIdx) {
+  let correct = 0;
+  for (let i = 0; i < answers.length; i++) {
+    if (answers[i] !== null && answers[i] === correctIdx[i]) correct++;
+  }
+  const total = answers.length;
+  return { correct, total, percent: Math.round((correct / total) * 100) };
+}
 
 const StreakManager = {
   markDailyDone() { const d = Storage.getStreakData(); d[TODAY()] = 'daily'; Storage.saveStreakData(d); },
@@ -122,6 +146,10 @@ const BADGES_DEF = [
   { id: 'fivehun', check: s => s.totalAnswered >= 500 },
   { id: 'perfect', check: s => s.hadPerfectQuiz },
   { id: 'ready',   check: s => s.avg30 >= 80 },
+  { id: 'trial_first',    check: s => s.trialCount >= 1 },
+  { id: 'trial_marathon', check: s => s.trialFullDone },
+  { id: 'trial_target',   check: s => s.trialBest >= 80 },
+  { id: 'trial_clock',    check: s => s.trialBeatClock },
 ];
 
 const BadgeManager = {
@@ -134,7 +162,13 @@ const BadgeManager = {
     const last30 = history.filter(r => new Date(r.date) >= cutoff);
     const avg30 = last30.length ? Math.round(last30.reduce((s, r) => s + r.percent, 0) / last30.length) : 0;
     const hadPerfectQuiz = history.some(r => r.percent === 100);
-    return { totalAnswered, totalQuizzes, currentStreak, avg30, hadPerfectQuiz };
+    const trials = history.filter(r => r.mode === 'trial');
+    const trialCount     = trials.length;
+    const trialFullDone  = trials.some(r => r.examLength === 180);
+    const trialBest      = trials.reduce((m, r) => Math.max(m, r.percent || 0), 0);
+    const trialBeatClock = trials.some(r => r.durationSec && r.timeLeftSec >= r.durationSec * 0.25);
+    return { totalAnswered, totalQuizzes, currentStreak, avg30, hadPerfectQuiz,
+             trialCount, trialFullDone, trialBest, trialBeatClock };
   },
   checkAndUnlock() {
     const stats = this.buildStats();
@@ -379,6 +413,67 @@ test('getPerDomain returns all domains', () => {
   reset();
   const domains = StatsManager.getPerDomain(mockQs);
   assert(domains.length > 0);
+});
+
+// ===== TRIAL EXAM TESTS (plan 12, sekcja 19a) =====
+console.log('\nTrial — variants & rating:');
+test('trialVariant returns matching variant', () => assertEqual(trialVariant('half').id, 'half'));
+test('trialVariant falls back to full', () => assertEqual(trialVariant('nope').id, 'full'));
+test('variant times: full=230, half=115, short=77', () => {
+  assert(trialVariant('full').minutes === 230 && trialVariant('half').minutes === 115 && trialVariant('short').minutes === 77);
+});
+test('variant questions: 180/90/60', () => {
+  assert(trialVariant('full').questions === 180 && trialVariant('half').questions === 90 && trialVariant('short').questions === 60);
+});
+test('trialRating 100 -> above', () => assertEqual(trialRating(100), 'above'));
+test('trialRating 80 -> above',  () => assertEqual(trialRating(80),  'above'));
+test('trialRating 79 -> target', () => assertEqual(trialRating(79),  'target'));
+test('trialRating 65 -> target', () => assertEqual(trialRating(65),  'target'));
+test('trialRating 64 -> below',  () => assertEqual(trialRating(64),  'below'));
+test('trialRating 50 -> below',  () => assertEqual(trialRating(50),  'below'));
+test('trialRating 49 -> needs',  () => assertEqual(trialRating(49),  'needs'));
+
+console.log('\nTrial — selectTrialQuestions:');
+const trialPool = Array.from({ length: 990 }, (_, i) => ({ id: i + 1 }));
+test('selectTrialQuestions returns n', () => assertEqual(QuizEngine.selectTrialQuestions(trialPool, 180).length, 180));
+test('selectTrialQuestions no duplicates', () => {
+  const sel = QuizEngine.selectTrialQuestions(trialPool, 180);
+  assertEqual(new Set(sel.map(q => q.id)).size, 180);
+});
+test('selectTrialQuestions caps at pool size', () => assertEqual(QuizEngine.selectTrialQuestions(trialPool.slice(0, 50), 180).length, 50));
+
+console.log('\nTrial — scoring (unanswered = wrong):');
+test('all correct -> 100%', () => assertEqual(scoreTrial([0,1,2,3], [0,1,2,3]).percent, 100));
+test('5 of 10 -> 50%', () => assertEqual(scoreTrial([0,0,0,0,0,9,9,9,9,9], [0,0,0,0,0,0,0,0,0,0]).percent, 50));
+test('null counts as wrong', () => assertEqual(scoreTrial([0, null, 2], [0, 1, 2]), { correct: 2, total: 3, percent: 67 }));
+
+console.log('\nTrial — buildStats & badges:');
+test('buildStats trial fields from history', () => {
+  reset();
+  Storage.saveResult({ date: '2026-01-01', mode: 'daily', percent: 90, total: 30 });
+  Storage.saveResult({ date: '2026-01-02', mode: 'trial', percent: 82, total: 180, examLength: 180, durationSec: 13800, timeLeftSec: 4000 });
+  const s = BadgeManager.buildStats();
+  assert(s.trialCount === 1, 'trialCount');
+  assert(s.trialFullDone === true, 'trialFullDone');
+  assert(s.trialBest === 82, 'trialBest');
+  assert(s.trialBeatClock === true, 'trialBeatClock (4000 >= 13800*0.25=3450)');
+});
+test('trialBeatClock false when time left < 25%', () => {
+  reset();
+  Storage.saveResult({ date: '2026-01-02', mode: 'trial', percent: 70, total: 60, examLength: 60, durationSec: 4620, timeLeftSec: 1000 });
+  assertEqual(BadgeManager.buildStats().trialBeatClock, false);
+});
+test('no trials -> zero/false stats', () => {
+  reset();
+  const s = BadgeManager.buildStats();
+  assert(s.trialCount === 0 && s.trialFullDone === false && s.trialBest === 0 && s.trialBeatClock === false);
+});
+test('trial badges unlock when conditions met', () => {
+  reset();
+  Storage.saveResult({ date: '2026-01-02', mode: 'trial', percent: 82, total: 180, examLength: 180, durationSec: 13800, timeLeftSec: 4000 });
+  BadgeManager.checkAndUnlock();
+  const u = Storage.getUnlockedBadges();
+  assert(u.includes('trial_first') && u.includes('trial_marathon') && u.includes('trial_target') && u.includes('trial_clock'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
