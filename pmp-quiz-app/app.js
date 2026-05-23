@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-80d0781f';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-34c21d7b';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -1479,7 +1479,7 @@ Views.trial = {
           <div class="trial-header__right">
             ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.trial._report()" title="${t('report_title')}">🚩</button>` : ''}
             ${langToggle}
-            <button class="trial-flag ${s.flags[i] ? 'active' : ''}" onclick="Views.trial._toggleFlag()" title="${t('trial_flag')}">🏴</button>
+            <button class="trial-flag ${s.flags[i] ? 'active' : ''}" onclick="Views.trial._toggleFlag()" title="${t('trial_flag')}">⚑︎</button>
           </div>
         </div>
         <div class="trial-subbar">
@@ -1547,8 +1547,14 @@ Views.trial = {
     if (!el) return;
     if (forceClose === true) { el.classList.add('hidden'); return; }
     const willShow = el.classList.contains('hidden');
-    if (willShow) el.innerHTML = this._renderPalette();
-    el.classList.toggle('hidden');
+    if (willShow) {
+      el.innerHTML = this._renderPalette();
+      el.classList.remove('hidden');
+      // Przewiń do świeżo otwartej palety pytań.
+      requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    } else {
+      el.classList.add('hidden');
+    }
   },
 
   // ---- Timer (odliczanie + auto-finalizacja) ----
@@ -1691,7 +1697,7 @@ Views['trial-result'] = {
       return `
         <div class="trial-review__item ${isCorrect ? 'is-correct' : 'is-wrong'}">
           <div class="trial-review__head">
-            <span class="trial-review__num">${i + 1}${flagged ? ' 🏴' : ''}</span>
+            <span class="trial-review__num">${i + 1}${flagged ? ' <span class="trial-review__flag">⚑︎</span>' : ''}</span>
             ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
             ${reportBtn}
           </div>

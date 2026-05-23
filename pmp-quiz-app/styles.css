@@ -1071,30 +1071,33 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 
 /* --- Runner --- */
 .trial { display: flex; flex-direction: column; gap: 16px; min-height: 100vh; }
-.trial-header { display: flex; align-items: center; gap: 8px; }
-.trial-header__right { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+/* 3 kolumny: lewa (✕) | środek (timer, wycentrowany) | prawa (🚩/EN/flaga) */
+.trial-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.trial-header > .quiz-abandon { justify-self: start; }
+.trial-header__right { display: flex; align-items: center; gap: 6px; justify-self: end; }
 .trial-timer {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--text);
-  margin: 0 auto;
+  justify-self: center;
   padding: 4px 12px;
   border-radius: var(--radius-xs);
   background: var(--surface2);
 }
 .trial-timer--warn { color: var(--red); background: var(--red-light); animation: trialPulse 1s ease-in-out infinite; }
 @keyframes trialPulse { 50% { opacity: .55; } }
+/* ⚑ to glif tekstowy (nie emoji) — przyjmuje color, więc jest widoczny na ciemnym tle */
 .trial-flag {
-  font-size: 1rem;
-  padding: 4px 6px;
+  font-size: 1.2rem;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
   line-height: 1;
-  opacity: 0.55;
-  filter: grayscale(1);
-  transition: opacity var(--transition), filter var(--transition), background var(--transition);
+  color: var(--text2);
+  transition: color var(--transition), background var(--transition);
 }
-.trial-flag.active { opacity: 1; filter: none; background: var(--yellow-light); }
+.trial-flag:hover { color: var(--text); background: var(--surface2); }
+.trial-flag.active { color: var(--yellow); background: var(--yellow-light); }
 
 .trial-subbar { display: flex; align-items: center; gap: 10px; }
 .trial-counter { font-size: 0.85rem; font-weight: 700; color: var(--text); white-space: nowrap; }
@@ -1147,7 +1150,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 }
 .trial-pcell.answered { border-color: var(--green); }
 .trial-pcell.empty    { background: var(--surface2); }
-.trial-pcell.flagged::after { content: '🏴'; position: absolute; top: -6px; right: -6px; font-size: .7rem; }
+.trial-pcell.flagged::after { content: '\2691\FE0E'; color: var(--yellow); position: absolute; top: -7px; right: -4px; font-size: .9rem; }
 .trial-pcell.current  { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* --- Ekran wyniku --- */
@@ -1199,6 +1202,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .trial-review__item.is-wrong   { border-left-color: var(--red); }
 .trial-review__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .trial-review__num { font-size: 0.8rem; font-weight: 700; color: var(--text2); }
+.trial-review__flag { color: var(--yellow); }
 .trial-review__report { margin-left: auto; font-size: 0.95rem; opacity: 0.8; padding: 2px 4px; }
 .trial-review__report:hover { opacity: 1; }
 .trial-review__q { font-size: 0.92rem; font-weight: 600; line-height: 1.5; margin-bottom: 8px; }
