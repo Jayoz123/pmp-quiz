@@ -4,3 +4,7 @@ pdfplumber==0.11.4
 openpyxl==3.1.2
 pytest==8.2.0
 Pillow==10.3.0
+
+# ── Faza A planu 13 (prep_pmbok.py): odszyfrowanie + ekstrakcja PMBOK ──
+pikepdf==10.5.1
+PyMuPDF==1.27.2.3

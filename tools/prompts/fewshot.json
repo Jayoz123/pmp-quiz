@@ -1,0 +1,52 @@
+[
+  {
+    "domain": "Ryzyko",
+    "eco_domain": "Process",
+    "eco_task": "Process-3",
+    "question": "Trzy tygodnie po starcie projektu wdrozenia ERP w firmie Lumea kluczowy dostawca integracji sygnalizuje mozliwe opoznienie o miesiac. Co kierownik projektu powinien zrobic NAJPIERW?",
+    "question_en": "Three weeks into Lumea's ERP rollout, a key integration vendor signals a possible one-month delay. What should the project manager do FIRST?",
+    "answers": [
+      "Natychmiast eskalowac problem do sponsora i poprosic o dodatkowy budzet.",
+      "Przeanalizowac wplyw na rejestr ryzyk i zaktualizowac ocene tego ryzyka.",
+      "Zmienic dostawce na takiego, ktory zadeklaruje krotszy termin.",
+      "Dodac rezerwe czasowa do harmonogramu, aby pochlonac opoznienie."
+    ],
+    "answers_en": [
+      "Immediately escalate to the sponsor and request additional budget.",
+      "Assess the impact in the risk register and update the risk's analysis.",
+      "Replace the vendor with one promising a shorter timeline.",
+      "Add schedule reserve to absorb the delay."
+    ],
+    "correct": 1,
+    "explanation": "Najpierw ocena wplywu i aktualizacja rejestru ryzyk - dopiero analiza daje podstawe do dalszych dzialan. Eskalacja, zmiana dostawcy czy rezerwa to reakcje wybrane przed zrozumieniem skali problemu.",
+    "explanation_en": "Assess impact and update the risk register first - analysis must precede response. Escalation, vendor change, or reserves are responses chosen before understanding the magnitude.",
+    "difficulty": "medium",
+    "qtype": "scenario",
+    "source_concept": "qualitative-risk-analysis"
+  },
+  {
+    "domain": "Ryzyko",
+    "eco_domain": "Process",
+    "eco_task": "Process-3",
+    "question": "W projekcie budowy aplikacji mobilnej dla startupu Vinto zidentyfikowano ryzyko awarii bramki platnosci: prawdopodobienstwo 30%, a szacowany skutek to strata 40 000 zl. Jaka jest oczekiwana wartosc pieniezna (EMV) tego ryzyka?",
+    "question_en": "In Vinto startup's mobile app project, a payment-gateway failure risk is identified: 30% probability and an estimated impact of 40,000 PLN loss. What is the expected monetary value (EMV) of this risk?",
+    "answers": [
+      "-12 000 zl",
+      "-40 000 zl",
+      "-52 000 zl",
+      "-28 000 zl"
+    ],
+    "answers_en": [
+      "-12,000 PLN",
+      "-40,000 PLN",
+      "-52,000 PLN",
+      "-28,000 PLN"
+    ],
+    "correct": 0,
+    "explanation": "EMV = prawdopodobienstwo x skutek = 0,30 x (-40 000) = -12 000 zl. Dla zagrozenia EMV jest ujemne. Pozostale wartosci wynikaja z bledow: wziecia pelnego skutku, dodawania lub odejmowania zamiast mnozenia.",
+    "explanation_en": "EMV = probability x impact = 0.30 x (-40,000) = -12,000 PLN. For a threat the EMV is negative. The other values come from errors: taking the full impact, or adding/subtracting instead of multiplying.",
+    "difficulty": "medium",
+    "qtype": "calculation",
+    "source_concept": "quantitative-risk-analysis-emv"
+  }
+]

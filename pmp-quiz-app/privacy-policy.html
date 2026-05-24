@@ -5,154 +5,309 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Polityka Prywatności — PMP Quiz</title>
   <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --bg-color: #f8fafc;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --white: #ffffff;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8fafc;
-      color: #1e293b;
+      background: var(--bg-color);
+      color: var(--text-main);
       line-height: 1.7;
-      padding: 24px 16px 64px;
+      padding: 16px 16px 64px;
     }
+
     .container { max-width: 720px; margin: 0 auto; }
+
+    .top-nav {
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 8px 0;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .btn-back:hover { color: var(--primary-dark); }
+
     header {
-      background: #6366f1;
-      color: #fff;
+      background: var(--primary);
+      color: var(--white);
       border-radius: 14px;
       padding: 32px 28px;
       margin-bottom: 32px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
     header h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    header p  { font-size: 0.9rem; opacity: 0.85; }
+    header p  { font-size: 0.9rem; opacity: 0.9; }
+
     section {
-      background: #fff;
+      background: var(--white);
       border-radius: 12px;
       padding: 24px 28px;
       margin-bottom: 16px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.07);
     }
+
     h2 {
       font-size: 1rem;
       font-weight: 700;
-      color: #6366f1;
+      color: var(--primary);
       margin-bottom: 12px;
       padding-bottom: 8px;
       border-bottom: 2px solid #e0e7ff;
     }
-    p  { margin-bottom: 10px; font-size: 0.95rem; }
+
+    p { margin-bottom: 10px; font-size: 0.95rem; }
     ul { margin: 10px 0 10px 20px; font-size: 0.95rem; }
     li { margin-bottom: 6px; }
-    a  { color: #6366f1; }
+    a { color: var(--primary); font-weight: 500; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
     .highlight {
       background: #e0e7ff;
-      border-left: 4px solid #6366f1;
+      border-left: 4px solid var(--primary);
       padding: 12px 16px;
       border-radius: 6px;
       font-size: 0.9rem;
       margin: 12px 0;
     }
+
     footer {
       text-align: center;
       font-size: 0.82rem;
-      color: #94a3b8;
+      color: var(--text-muted);
       margin-top: 32px;
     }
+
+    [lang] { display: none; }
+    body.lang-pl [lang="pl"] { display: block; }
+    body.lang-en [lang="en"] { display: block; }
   </style>
 </head>
-<body>
+<body class="lang-pl">
+
 <div class="container">
+  <nav class="top-nav">
+    <a href="/index.html" class="btn-back">
+      <span lang="pl">‹ Wróć do aplikacji</span>
+      <span lang="en">‹ Back to app</span>
+    </a>
+  </nav>
 
   <header>
-    <h1>📋 Polityka Prywatności</h1>
-    <p>Aplikacja: <strong>PMP Quiz</strong> &nbsp;·&nbsp; Ostatnia aktualizacja: 19 maja 2026</p>
+    <h1 lang="pl">📋 Polityka Prywatności</h1>
+    <h1 lang="en">📋 Privacy Policy</h1>
+    <p lang="pl">Aplikacja: <strong>PMP Quiz</strong> &nbsp;·&nbsp; Ostatnia aktualizacja: 19 maja 2026</p>
+    <p lang="en">App: <strong>PMP Quiz</strong> &nbsp;·&nbsp; Last update: May 19, 2026</p>
   </header>
 
-  <section>
-    <h2>1. Administrator danych</h2>
-    <p>Administratorem Twoich danych osobowych jest Bartosz Stolarski (dalej: „my", „administrator").</p>
-    <p>Kontakt w sprawach prywatności: <a href="mailto:bart100larski@gmail.com">bart100larski@gmail.com</a></p>
-  </section>
+  <!-- POLISH CONTENT -->
+  <div lang="pl">
+    <section>
+      <h2>1. Administrator danych</h2>
+      <p>Administratorem Twoich danych osobowych jest Bartosz Stolarski (dalej: „my", „administrator").</p>
+      <p>Kontakt w sprawach prywatności: <a href="mailto:bart100larski@gmail.com">bart100larski@gmail.com</a></p>
+    </section>
 
-  <section>
-    <h2>2. Jakie dane zbieramy</h2>
-    <p>Aplikacja PMP Quiz zbiera wyłącznie dane niezbędne do działania usługi:</p>
-    <ul>
-      <li><strong>Adres email</strong> — służy do utworzenia konta i logowania</li>
-      <li><strong>Dane postępu nauki</strong> — wyniki quizów, seria dni, odblokowane odznaki, lista słabo opanowanych pytań</li>
-      <li><strong>Historia sesji quizów</strong> — tryb, wynik procentowy, data rozegrania</li>
-    </ul>
-    <div class="highlight">
-      Nie zbieramy imienia, nazwiska, numeru telefonu, danych płatniczych ani lokalizacji.
-    </div>
-  </section>
+    <section>
+      <h2>2. Jakie dane zbieramy</h2>
+      <p>Aplikacja PMP Quiz zbiera wyłącznie dane niezbędne do działania usługi:</p>
+      <ul>
+        <li><strong>Adres email</strong> — służy do utworzenia konta i logowania</li>
+        <li><strong>Dane postępu nauki</strong> — wyniki quizów, seria dni, odblokowane odznaki, lista słabo opanowanych pytań</li>
+        <li><strong>Historia sesji quizów</strong> — tryb, wynik procentowy, data rozegrania</li>
+      </ul>
+      <div class="highlight">
+        Nie zbieramy imienia, nazwiska, numeru telefonu, danych płatniczych ani lokalizacji.
+      </div>
+    </section>
 
-  <section>
-    <h2>3. Cel i podstawa prawna przetwarzania</h2>
-    <ul>
-      <li><strong>Realizacja usługi (art. 6 ust. 1 lit. b RODO)</strong> — prowadzenie konta użytkownika, synchronizacja postępu nauki między urządzeniami</li>
-      <li><strong>Uzasadniony interes administratora (art. 6 ust. 1 lit. f RODO)</strong> — zapobieganie nadużyciom i zapewnienie bezpieczeństwa aplikacji</li>
-    </ul>
-  </section>
+    <section>
+      <h2>3. Cel i podstawa prawna przetwarzania</h2>
+      <ul>
+        <li><strong>Realizacja usługi (art. 6 ust. 1 lit. b RODO)</strong> — prowadzenie konta użytkownika, synchronizacja postępu nauki między urządzeniami</li>
+        <li><strong>Uzasadniony interes administratora (art. 6 ust. 1 lit. f RODO)</strong> — zapobieganie nadużyciom i zapewnienie bezpieczeństwa aplikacji</li>
+      </ul>
+    </section>
 
-  <section>
-    <h2>4. Gdzie przechowujemy dane</h2>
-    <p>Dane konta i postępu nauki przechowywane są na platformie <strong>Supabase</strong> (infrastruktura EU — Frankfurt, Niemcy), co zapewnia zgodność z RODO.</p>
-    <p>Supabase jest sub-procesorem danych działającym zgodnie z RODO. Więcej informacji: <a href="https://supabase.com/privacy" target="_blank">supabase.com/privacy</a></p>
-    <p>Dane lokalne (postęp offline) przechowywane są w pamięci lokalnej urządzenia (localStorage) i nie są przesyłane do stron trzecich.</p>
-  </section>
+    <section>
+      <h2>4. Gdzie przechowujemy dane</h2>
+      <p>Dane konta i postępu nauki przechowywane są na platformie <strong>Supabase</strong> (infrastruktura EU — Frankfurt, Niemcy), co zapewnia zgodność z RODO.</p>
+      <p>Supabase jest sub-procesorem danych działającym zgodnie z RODO. Więcej informacji: <a href="https://supabase.com/privacy" target="_blank">supabase.com/privacy</a></p>
+      <p>Dane lokalne (postęp offline) przechowywane są w pamięci lokalnej urządzenia (localStorage) i nie są przesyłane do stron trzecich.</p>
+    </section>
 
-  <section>
-    <h2>5. Udostępnianie danych</h2>
-    <p>Nie sprzedajemy, nie wynajmujemy ani nie udostępniamy Twoich danych osobom trzecim, z wyjątkiem:</p>
-    <ul>
-      <li><strong>Supabase Inc.</strong> — jako dostawca infrastruktury backendowej (sub-procesor)</li>
-      <li>Organów publicznych — wyłącznie gdy wymagają tego przepisy prawa</li>
-    </ul>
-    <p>Aplikacja nie wyświetla reklam i nie integruje się z sieciami reklamowymi.</p>
-  </section>
+    <section>
+      <h2>5. Udostępnianie danych</h2>
+      <p>Nie sprzedajemy, nie wynajmujemy ani nie udostępniamy Twoich danych osobom trzecim, z wyjątkiem:</p>
+      <ul>
+        <li><strong>Supabase Inc.</strong> — jako dostawca infrastruktury backendowej (sub-procesor)</li>
+        <li>Organów publicznych — wyłącznie gdy wymagają tego przepisy prawa</li>
+      </ul>
+      <p>Aplikacja nie wyświetla reklam i nie integruje się z sieciami reklamowymi.</p>
+    </section>
 
-  <section>
-    <h2>6. Okres przechowywania danych</h2>
-    <p>Dane przechowujemy przez cały czas istnienia Twojego konta. Po usunięciu konta dane są trwale usuwane w ciągu <strong>30 dni</strong>.</p>
-  </section>
+    <section>
+      <h2>6. Okres przechowywania danych</h2>
+      <p>Dane przechowujemy przez cały czas istnienia Twojego konta. Po usunięciu konta dane są trwale usuwane w ciągu <strong>30 dni</strong>.</p>
+    </section>
 
-  <section>
-    <h2>7. Twoje prawa</h2>
-    <p>Na podstawie RODO przysługują Ci następujące prawa:</p>
-    <ul>
-      <li><strong>Prawo dostępu</strong> — możesz zażądać informacji o przetwarzanych danych</li>
-      <li><strong>Prawo do sprostowania</strong> — możesz poprawić nieprawidłowe dane</li>
-      <li><strong>Prawo do usunięcia</strong> — możesz zażądać usunięcia konta i wszystkich danych</li>
-      <li><strong>Prawo do przenoszenia</strong> — możesz otrzymać dane w formacie JSON</li>
-      <li><strong>Prawo do sprzeciwu</strong> — możesz sprzeciwić się określonemu przetwarzaniu</li>
-    </ul>
-    <p>Aby skorzystać z tych praw, skontaktuj się z nami na adres: <a href="mailto:bart100larski@gmail.com">bart100larski@gmail.com</a></p>
-    <p>Masz też prawo złożenia skargi do Prezesa Urzędu Ochrony Danych Osobowych (UODO), ul. Stawki 2, 00-193 Warszawa.</p>
-  </section>
+    <section>
+      <h2>7. Twoje prawa</h2>
+      <p>Na podstawie RODO przysługują Ci następujące prawa:</p>
+      <ul>
+        <li><strong>Prawo dostępu</strong> — możesz zażądać informacji o przetwarzanych danych</li>
+        <li><strong>Prawo do sprostowania</strong> — możesz poprawić nieprawidłowe dane</li>
+        <li><strong>Prawo do usunięcia</strong> — możesz zażądać usunięcia konta i wszystkich danych</li>
+        <li><strong>Prawo do przenoszenia</strong> — możesz otrzymać dane w formacie JSON</li>
+        <li><strong>Prawo do sprzeciwu</strong> — możesz sprzeciwić się określonemu przetwarzaniu</li>
+      </ul>
+      <p>Aby skorzystać z tych praw, skontaktuj się z nami na adres: <a href="mailto:bart100larski@gmail.com">bart100larski@gmail.com</a></p>
+      <p>Masz też prawo złożenia skargi do Prezesa Urzędu Ochrony Danych Osobowych (UODO), ul. Stawki 2, 00-193 Warszawa.</p>
+    </section>
 
-  <section>
-    <h2>8. Bezpieczeństwo</h2>
-    <p>Stosujemy następujące środki bezpieczeństwa:</p>
-    <ul>
-      <li>Szyfrowanie transmisji danych (HTTPS / TLS)</li>
-      <li>Row Level Security (RLS) — każdy użytkownik ma dostęp wyłącznie do swoich danych</li>
-      <li>Hasła przechowywane jako bezpieczne hasze (bcrypt) przez Supabase Auth</li>
-    </ul>
-  </section>
+    <section>
+      <h2>8. Bezpieczeństwo</h2>
+      <p>Stosujemy następujące środki bezpieczeństwa:</p>
+      <ul>
+        <li>Szyfrowanie transmisji danych (HTTPS / TLS)</li>
+        <li>Row Level Security (RLS) — każdy użytkownik ma dostęp wyłącznie do swoich danych</li>
+        <li>Hasła przechowywane jako bezpieczne hasze (bcrypt) przez Supabase Auth</li>
+      </ul>
+    </section>
 
-  <section>
-    <h2>9. Dzieci</h2>
-    <p>Aplikacja PMP Quiz skierowana jest do dorosłych profesjonalistów przygotowujących się do egzaminu PMP. Nie zbieramy świadomie danych osób poniżej 16. roku życia.</p>
-  </section>
+    <section>
+      <h2>9. Dzieci</h2>
+      <p>Aplikacja PMP Quiz skierowana jest do dorosłych profesjonalistów przygotowujących się do egzaminu PMP. Nie zbieramy świadomie danych osób poniżej 16. roku życia.</p>
+    </section>
 
-  <section>
-    <h2>10. Zmiany polityki prywatności</h2>
-    <p>O istotnych zmianach poinformujemy przez email lub komunikat w aplikacji. Aktualna wersja polityki jest zawsze dostępna pod tym adresem.</p>
-  </section>
+    <section>
+      <h2>10. Zmiany polityki prywatności</h2>
+      <p>O istotnych zmianach poinformujemy przez email lub komunikat w aplikacji. Aktualna wersja polityki jest zawsze dostępna pod tym adresem.</p>
+    </section>
+  </div>
+
+  <!-- ENGLISH CONTENT -->
+  <div lang="en">
+    <section>
+      <h2>1. Data Controller</h2>
+      <p>The controller of your personal data is Bartosz Stolarski (hereinafter: "we", "controller").</p>
+      <p>Privacy contact: <a href="mailto:bart100larski@gmail.com">bart100larski@gmail.com</a></p>
+    </section>
+
+    <section>
+      <h2>2. What data we collect</h2>
+      <p>The PMP Quiz app collects only the data necessary for the service to function:</p>
+      <ul>
+        <li><strong>Email address</strong> — used for account creation and login</li>
+        <li><strong>Learning progress data</strong> — quiz results, daily streaks, unlocked badges, list of weak questions</li>
+        <li><strong>Quiz session history</strong> — mode, percentage score, date played</li>
+      </ul>
+      <div class="highlight">
+        We do not collect names, phone numbers, payment data, or location.
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Purpose and legal basis for processing</h2>
+      <ul>
+        <li><strong>Service execution (Art. 6.1.b GDPR)</strong> — maintaining the user account, synchronizing learning progress between devices</li>
+        <li><strong>Legitimate interest of the controller (Art. 6.1.f GDPR)</strong> — preventing abuse and ensuring the security of the application</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Where we store data</h2>
+      <p>Account and progress data are stored on the <strong>Supabase</strong> platform (EU infrastructure — Frankfurt, Germany), ensuring GDPR compliance.</p>
+      <p>Supabase is a data sub-processor operating in accordance with GDPR. More info: <a href="https://supabase.com/privacy" target="_blank">supabase.com/privacy</a></p>
+      <p>Local data (offline progress) is stored in the device's local memory (localStorage) and is not sent to third parties.</p>
+    </section>
+
+    <section>
+      <h2>5. Data sharing</h2>
+      <p>We do not sell, rent, or share your data with third parties, except for:</p>
+      <ul>
+        <li><strong>Supabase Inc.</strong> — as a backend infrastructure provider (sub-processor)</li>
+        <li>Public authorities — only when required by law</li>
+      </ul>
+      <p>The app does not display ads and does not integrate with advertising networks.</p>
+    </section>
+
+    <section>
+      <h2>6. Data retention period</h2>
+      <p>We store data for as long as your account exists. After account deletion, data is permanently deleted within <strong>30 days</strong>.</p>
+    </section>
+
+    <section>
+      <h2>7. Your rights</h2>
+      <p>Under GDPR, you have the following rights:</p>
+      <ul>
+        <li><strong>Right of access</strong> — you can request information about the processed data</li>
+        <li><strong>Right to rectification</strong> — you can correct inaccurate data</li>
+        <li><strong>Right to erasure</strong> — you can request deletion of your account and all data</li>
+        <li><strong>Right to portability</strong> — you can receive data in JSON format</li>
+        <li><strong>Right to object</strong> — you can object to specific processing</li>
+      </ul>
+      <p>To exercise these rights, contact us at: <a href="mailto:bart100larski@gmail.com">bart100larski@gmail.com</a></p>
+      <p>You also have the right to lodge a complaint with the President of the Personal Data Protection Office (UODO), ul. Stawki 2, 00-193 Warsaw, Poland.</p>
+    </section>
+
+    <section>
+      <h2>8. Security</h2>
+      <p>We use the following security measures:</p>
+      <ul>
+        <li>Data transmission encryption (HTTPS / TLS)</li>
+        <li>Row Level Security (RLS) — each user has access only to their own data</li>
+        <li>Passwords stored as secure hashes (bcrypt) by Supabase Auth</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>9. Children</h2>
+      <p>The PMP Quiz app is aimed at adult professionals preparing for the PMP exam. We do not knowingly collect data from persons under 16 years of age.</p>
+    </section>
+
+    <section>
+      <h2>10. Changes to the privacy policy</h2>
+      <p>We will inform you about significant changes via email or an in-app message. The current version of the policy is always available at this address.</p>
+    </section>
+  </div>
 
   <footer>
     <p>© 2026 Bartosz Stolarski · PMP Quiz · <a href="mailto:bart100larski@gmail.com">bart100larski@gmail.com</a></p>
   </footer>
 
 </div>
+
+<script>
+  (function() {
+    try {
+      const settings = JSON.parse(localStorage.getItem('settings') || '{}');
+      const lang = settings.defaultLanguage || 'pl';
+      document.body.className = 'lang-' + lang;
+      document.documentElement.lang = lang;
+    } catch (e) {
+      console.warn('Could not load language settings:', e);
+    }
+  })();
+</script>
 </body>
 </html>

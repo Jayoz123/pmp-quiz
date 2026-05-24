@@ -1,0 +1,37 @@
+KONCEPT DO PRZETESTOWANIA:
+- ECO domena: {{eco_domain}}   |  ECO zadanie: {{eco_task}} ({{eco_task_label_pl}})
+- Obszar wiedzy (podtag/domain): {{ka_tag}}
+- Koncept (PL/EN): {{koncept_pl}} / {{koncept_en}}
+- Poziom trudnosci (sugerowany): {{difficulty}}   |  Typ (sugerowany): {{qtype}}
+- source_concept (wpisz doslownie w kazdym obiekcie): {{source_concept}}
+
+KONTEKST MERYTORYCZNY (do NAUKI pojecia - NIE cytowac, NIE parafrazowac blisko):
+{{pmbok_chunk_text}}
+
+GLOSARIUSZ (trzymaj sie tych tlumaczen PL<->EN):
+{{glossary_subset}}
+
+ZADANIE:
+Wygeneruj {{N}} autorskich pytan testujacych powyzszy koncept, zgodnie z zasadami z system
+promptu. Zroznicuj scenariusze (rozne branze, role, fazy projektu) i pozycje poprawnej
+odpowiedzi (correct ma byc mieszane 0-3). Dla pytan scenariuszowych pisz krotki, konkretny
+kontekst i pytaj o najlepsze/pierwsze dzialanie. Dla obliczeniowych podaj wszystkie liczby.
+
+SCHEMAT (kazdy obiekt tablicy):
+{
+  "domain": "{{ka_tag}}",
+  "eco_domain": "{{eco_domain}}",
+  "eco_task": "{{eco_task}}",
+  "question": "PL...",
+  "question_en": "EN...",
+  "answers": ["PL1","PL2","PL3","PL4"],
+  "answers_en": ["EN1","EN2","EN3","EN4"],
+  "correct": 0,
+  "explanation": "PL: dlaczego poprawna + czemu pozostale gorsze",
+  "explanation_en": "EN: why correct + why others worse",
+  "difficulty": "easy|medium|hard",
+  "qtype": "scenario|knowledge|calculation",
+  "source_concept": "{{source_concept}}"
+}
+
+Zwroc TABLICE JSON dokladnie {{N}} obiektow. Nic poza JSON.
