@@ -506,6 +506,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   font-family: inherit;
   font-size: 1rem;
   transition: background var(--transition);
+  margin-top: 16px;
 }
 
 /* ===== SUMMARY SCREEN ===== */

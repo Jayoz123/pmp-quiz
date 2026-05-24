@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-b9f7aa3d';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-d97b81b1';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -1544,6 +1544,17 @@ Views.trial = {
     Storage.saveTrialSession(s);
     document.querySelectorAll('.answer-btn').forEach((b, k) =>
       b.classList.toggle('selected', k === idx));
+
+    if (Storage.getSettings().autoScrollEnabled) {
+      setTimeout(() => {
+        const nav = document.querySelector('.trial-nav');
+        if (nav) {
+          nav.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } else {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+      }, 100);
+    }
   },
 
   _toggleFlag() {
