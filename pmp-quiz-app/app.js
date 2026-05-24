@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-3cab6909';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-6494fa9a';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -121,6 +121,9 @@ const I18N = {
   confidence_label:   { pl: 'Ocena pewności',                   en: 'Confidence rating' },
   confidence_desc:    { pl: 'Skala 1–3 przed odpowiedzią',      en: '1–3 scale before answering' },
   confidence_aria:    { pl: 'Włącz ocenę pewności',             en: 'Enable confidence rating' },
+  auto_scroll_label:  { pl: 'Automatyczne przewijanie',         en: 'Auto-scroll' },
+  auto_scroll_desc:   { pl: 'Przewiń do dołu po odpowiedzi',    en: 'Scroll to bottom after answering' },
+  auto_scroll_aria:   { pl: 'Włącz automatyczne przewijanie',   en: 'Enable auto-scroll' },
   app_language:       { pl: 'Język aplikacji',                  en: 'App language' },
   app_language_desc:  { pl: 'Język całej aplikacji i pytań',    en: 'Language of the whole app and questions' },
   sign_out:           { pl: 'Wyloguj się',                      en: 'Sign out' },
@@ -247,7 +250,7 @@ const Storage = {
   saveWeakQuestions(wq) { this._set('weak_questions', wq); },
   getUnlockedBadges()   { return this._get('unlocked_badges', []); },
   saveUnlockedBadges(b) { this._set('unlocked_badges', b); },
-  getSettings()         { return this._get('settings', { confidenceEnabled: true, defaultLanguage: 'pl' }); },
+  getSettings()         { return this._get('settings', { confidenceEnabled: true, autoScrollEnabled: true, defaultLanguage: 'pl' }); },
   saveSettings(s)       { this._set('settings', s); },
   getConfidenceData()   { return this._get('confidence_data', {}); },
   saveConfidenceData(d) { this._set('confidence_data', d); },
@@ -1205,6 +1208,22 @@ Views.home = {
         <div class="settings-separator"></div>
         <div class="settings-row">
           <div class="settings-row__info">
+            <span class="settings-row__icon">📜</span>
+            <div>
+              <div class="settings-row__label">${t('auto_scroll_label')}</div>
+              <div class="settings-row__desc">${t('auto_scroll_desc')}</div>
+            </div>
+          </div>
+          <label class="settings-toggle" aria-label="${t('auto_scroll_aria')}">
+            <input type="checkbox" id="autoscroll-toggle"
+                   ${settings.autoScrollEnabled !== false ? 'checked' : ''}
+                   onchange="Views.home._toggleAutoScroll(this.checked)">
+            <span class="settings-toggle__slider"></span>
+          </label>
+        </div>
+        <div class="settings-separator"></div>
+        <div class="settings-row">
+          <div class="settings-row__info">
             <span class="settings-row__icon">🌐</span>
             <div>
               <div class="settings-row__label">${t('app_language')}</div>
@@ -1235,6 +1254,13 @@ Views.home = {
   _toggleConfidence(enabled) {
     const s = Storage.getSettings();
     s.confidenceEnabled = enabled;
+    Storage.saveSettings(s);
+    SupabaseSync.pushProgress().catch(console.error);
+  },
+
+  _toggleAutoScroll(enabled) {
+    const s = Storage.getSettings();
+    s.autoScrollEnabled = enabled;
     Storage.saveSettings(s);
     SupabaseSync.pushProgress().catch(console.error);
   },
@@ -2034,6 +2060,12 @@ Views.quiz = {
         <p class="explanation-text" id="expl-text">${explanationText}</p>
       </div>
       <button class="btn-next" onclick="Views.quiz._advance()">${t('next')}</button>`;
+
+    if (Storage.getSettings().autoScrollEnabled) {
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }, 100);
+    }
   },
 
   _toggleExplLang(btn, qIdx) {
