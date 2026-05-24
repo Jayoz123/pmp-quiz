@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-6494fa9a';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-b9f7aa3d';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -250,7 +250,10 @@ const Storage = {
   saveWeakQuestions(wq) { this._set('weak_questions', wq); },
   getUnlockedBadges()   { return this._get('unlocked_badges', []); },
   saveUnlockedBadges(b) { this._set('unlocked_badges', b); },
-  getSettings()         { return this._get('settings', { confidenceEnabled: true, autoScrollEnabled: true, defaultLanguage: 'pl' }); },
+  getSettings()         {
+    const defaults = { confidenceEnabled: true, autoScrollEnabled: true, defaultLanguage: 'pl' };
+    return { ...defaults, ...this._get('settings', {}) };
+  },
   saveSettings(s)       { this._set('settings', s); },
   getConfidenceData()   { return this._get('confidence_data', {}); },
   saveConfidenceData(d) { this._set('confidence_data', d); },
@@ -2063,7 +2066,12 @@ Views.quiz = {
 
     if (Storage.getSettings().autoScrollEnabled) {
       setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        const btnNext = panel.querySelector('.btn-next');
+        if (btnNext) {
+          btnNext.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } else {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
       }, 100);
     }
   },
