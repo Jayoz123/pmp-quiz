@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-6f61ef65';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-5c0dd037';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -81,12 +81,16 @@ const I18N = {
   // login
   login_subtitle:     { pl: 'Nauka do egzaminu PMP',            en: 'Study for the PMP exam' },
   email_ph:           { pl: 'Adres email',                      en: 'Email address' },
+  login_id_ph:        { pl: 'Email lub nick',                   en: 'Email or nick' },
+  nick_ph:            { pl: 'Nick (3–20 znaków)',               en: 'Nick (3–20 characters)' },
+  nick_hint:          { pl: 'Litery, cyfry, _ lub - · bez spacji', en: 'Letters, digits, _ or - · no spaces' },
+  nick_required:      { pl: 'Nick musi mieć 3–20 znaków: litery, cyfry, _ lub -.', en: 'Nick must be 3–20 chars: letters, digits, _ or -.' },
   pass_ph:            { pl: 'Hasło (min. 6 znaków)',            en: 'Password (min. 6 characters)' },
   sign_up:            { pl: 'Zarejestruj się',                  en: 'Sign up' },
   sign_in:            { pl: 'Zaloguj się',                      en: 'Sign in' },
   have_account:       { pl: '← Mam już konto — zaloguj się',    en: '← I already have an account — sign in' },
   no_account:         { pl: 'Nie mam konta — zarejestruj się →', en: "Don't have an account — sign up →" },
-  enter_credentials:  { pl: 'Podaj email i hasło.',             en: 'Enter your email and password.' },
+  enter_credentials:  { pl: 'Podaj email/nick i hasło.',        en: 'Enter your email/nick and password.' },
   check_email:        { pl: 'Sprawdź email i kliknij link potwierdzający, a potem wróć i zaloguj się.', en: 'Check your email and click the confirmation link, then come back and sign in.' },
   generic_error:      { pl: 'Błąd — spróbuj ponownie.',         en: 'Error — please try again.' },
   session_kicked:     { pl: 'Konto zostało zalogowane na innym urządzeniu. Zaloguj się ponownie.', en: 'Your account was signed in on another device. Please sign in again.' },
@@ -363,11 +367,12 @@ const SupabaseSync = {
 
       const { data: profile, error } = await sb()
         .from('user_profiles')
-        .select('is_tester, can_report_bugs, can_see_debug_info')
+        .select('nick, is_tester, can_report_bugs, can_see_debug_info')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (!error && profile) {
+        AppState.nick            = profile.nick              ?? null;
         AppState.isTester        = profile.is_tester        ?? false;
         AppState.canReportBugs   = profile.can_report_bugs   ?? false;
         AppState.canSeeDebugInfo = profile.can_see_debug_info ?? false;
@@ -534,7 +539,42 @@ const SessionGuard = {
 
 // ==================== AUTH ====================
 const Auth = {
-  async signIn(email, password) {
+  // Nick format (mirrors migration 13 CHECK + the Edge Functions):
+  // 3–20 chars, [A-Za-z0-9_-], no spaces, no diacritics.
+  NICK_RE: /^[A-Za-z0-9_-]{3,20}$/,
+
+  // A login identifier is an email if it contains '@'. The nick regex forbids
+  // '@', so the two namespaces never overlap and this heuristic is unambiguous.
+  isEmail(id) { return id.includes('@'); },
+
+  // Translate a nick → email via the resolve-nick Edge Function (service_role,
+  // so user emails are NOT publicly readable — RODO). Returns the email string,
+  // or throws an Error with a user-facing (deliberately vague) message.
+  async resolveNick(nick) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/resolve-nick`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'apikey':        SUPABASE_ANON,
+      },
+      body: JSON.stringify({ nick }),
+    });
+    let data;
+    try { data = await res.json(); }
+    catch { throw new Error(t('generic_error')); }
+    if (!data || !data.ok || !data.email) {
+      // Uniform message — never reveal whether the nick exists (anti-enumeration).
+      throw new Error((data && data.error) || t('generic_error'));
+    }
+    return data.email;
+  },
+
+  // Accepts an email OR a nick as the identifier. If it's a nick, resolve it to
+  // an email first, then sign in with email+password as usual.
+  async signIn(identifier, password) {
+    const id    = String(identifier || '').trim();
+    const email = this.isEmail(id) ? id : await this.resolveNick(id);
     const { error } = await sb().auth.signInWithPassword({ email, password });
     if (error) throw error;
   },
@@ -545,7 +585,7 @@ const Auth = {
   // Beta registration goes through the register-beta-user Edge Function, which
   // is the only way to create an account once "Enable sign ups" is OFF.
   // Returns { ok } on success, or { error } with a user-facing message.
-  async registerBeta(code, email, password) {
+  async registerBeta(code, email, password, nick) {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/register-beta-user`, {
       method:  'POST',
       headers: {
@@ -553,7 +593,7 @@ const Auth = {
         'Authorization': `Bearer ${SUPABASE_ANON}`,
         'apikey':        SUPABASE_ANON,
       },
-      body: JSON.stringify({ code, email, password }),
+      body: JSON.stringify({ code, email, password, nick }),
     });
     let data;
     try { data = await res.json(); }
@@ -891,6 +931,7 @@ const AppState = {
   pendingMode:  null,
   pendingDomains: [],
   showEnglish:  false,  // EN/PL toggle state
+  nick:            null,  // user's unique nick (user_profiles.nick); null for legacy accounts
   isTester:        false, // gates per-question EN/PL override (user_profiles.is_tester, source of truth)
   canReportBugs:   false, // gates the "Report issue" 🚩 button (user_profiles.can_report_bugs)
   canSeeDebugInfo: false, // gates future diagnostics (user_profiles.can_see_debug_info)
@@ -1139,8 +1180,18 @@ Views.login = {
         <p class="login-subtitle">${isReg ? t('login_subtitle_beta') : t('login_subtitle')}</p>
         ${kickedBanner}
         <div class="login-form">
+          ${isReg ? `
           <input type="email" id="l-email" placeholder="${t('email_ph')}"
-                 autocomplete="email" inputmode="email" />
+                 autocomplete="email" inputmode="email" />` : `
+          <input type="text" id="l-email" placeholder="${t('login_id_ph')}"
+                 autocomplete="username" inputmode="text" spellcheck="false"
+                 autocapitalize="none" />`}
+          ${isReg ? `
+          <input type="text" id="l-nick" placeholder="${t('nick_ph')}"
+                 autocomplete="off" maxlength="20" spellcheck="false"
+                 autocapitalize="none" inputmode="text"
+                 oninput="this.value = this.value.replace(/[^A-Za-z0-9_-]/g,'')" />
+          <p class="login-beta-hint">${t('nick_hint')}</p>` : ''}
           <input type="password" id="l-pass"
                  placeholder="${t('pass_ph')}"
                  autocomplete="${isReg ? 'new-password' : 'current-password'}" />
@@ -1176,6 +1227,9 @@ Views.login = {
     const registerLabel = t('sign_up_beta');
 
     if (this._mode === 'register') {
+      const nick = document.getElementById('l-nick')?.value.trim();
+      if (!nick || !Auth.NICK_RE.test(nick)) { this._msg(t('nick_required'), false); return; }
+
       const code = document.getElementById('l-code')?.value.trim().toUpperCase();
       if (!code || code.length < 12) { this._msg(t('code_required'), false); return; }
 
@@ -1183,7 +1237,7 @@ Views.login = {
       this._msg(t('register_verifying'), true);
 
       try {
-        const data = await Auth.registerBeta(code, email, pass);
+        const data = await Auth.registerBeta(code, email, pass, nick);
         if (!data || !data.ok) {
           this._msg((data && data.error) || t('generic_error'), false);
           btn.disabled = false; btn.textContent = registerLabel;
