@@ -9,11 +9,22 @@ generuje male partie (5-8) pytan przez API. Zapisuje surowe partie do out/raw_ba
 Klucz API czytany z .env (ANTHROPIC_API_KEY). Tryb --dry-run sklada i zapisuje DOKLADNE
 prompty (bez wywolania API i bez kosztow) - sluzy do kalibracji w M1.
 
+OPTYMALIZACJA TOKENOW (przed M3, na podstawie M2):
+  - batch-size domyslnie 7 (bylo 5): wiekszosc konceptow PMBOK (kwoty 6-8) miesci sie
+    w 1 batchu zamiast 2 -> mniej powtarzanego kontekstu (chunk PMBOK ~2600 slow nie
+    leci dwa razy). M3 PMBOK: 266 batchy (bs=5) -> 206 batchy (bs=7).
+  - prompt caching (domyslnie ON, wylacz przez --no-cache): STALY prefiks system + few-shot
+    (identyczny dla KAZDEGO batcha, ~1.9k tok) dostaje cache_control 'ephemeral'. Anthropic
+    liczy go ~90% taniej (cache_read) w kolejnych batchach. Few-shot przeniesiony z konca
+    user prompta do stalego prefiksu, by caly prefiks dalo sie cache'owac.
+  - log USAGE w runs/*.log + podsumowanie tokenow (input/cache_write/cache_read/output).
+
 Pilotaz M1 (rodzina Ryzyko, ~50 pytan):
   python tools/generate_questions.py --eco-task Process-3 --per-concept 10 --batch-size 5 --dry-run
   python tools/generate_questions.py --eco-task Process-3 --per-concept 10 --batch-size 5
 
-Zaleznosci: anthropic (tylko dla realnego wywolania; --dry-run nie wymaga).
+Zaleznosci: anthropic>=0.69 (tylko dla realnego wywolania; --dry-run nie wymaga).
+  Caching wymaga SDK >=0.69 (format bloku system z cache_control); zweryfikowane na 0.104.1.
 """
 import argparse
 import csv
@@ -139,7 +150,17 @@ def fill_template(tpl, mapping):
     return tpl
 
 
-def build_user_prompt(template, fewshot_text, concept, chunk_text, gloss, n):
+def build_system_block(system, fewshot_text):
+    """Sklada STALY prefiks (system prompt + few-shot) - identyczny dla KAZDEGO batcha.
+    Few-shot byl wczesniej doklejany na koncu user prompta (po zmiennym chunku), co
+    uniemozliwialo cache - teraz jest czescia stalego prefiksu, wiec caleyprefiks da sie
+    cache'owac (cache_control w call_anthropic)."""
+    return (system
+            + "\n\nPRZYKLADY STYLU I FORMATU (wlasne, autorskie - NASLADUJ format/poziom, "
+              "NIE kopiuj tresci):\n" + fewshot_text)
+
+
+def build_user_prompt(template, concept, chunk_text, gloss, n):
     mapping = {
         "eco_domain": concept["eco_domain"],
         "eco_task": concept["eco_task"],
@@ -154,10 +175,7 @@ def build_user_prompt(template, fewshot_text, concept, chunk_text, gloss, n):
         "glossary_subset": gloss,
         "N": n,
     }
-    filled = fill_template(template, mapping)
-    filled += ("\n\nPRZYKLADY STYLU I FORMATU (wlasne, autorskie - NASLADUJ format/poziom, "
-               "NIE kopiuj tresci):\n" + fewshot_text)
-    return filled
+    return fill_template(template, mapping)
 
 
 # ---------- parsowanie odpowiedzi modelu ----------
@@ -172,14 +190,25 @@ def extract_json_array(text):
 
 
 # ---------- wywolanie API ----------
-def call_anthropic(api_key, model, temperature, system, user):
+def call_anthropic(api_key, model, temperature, system_block, user, cache=True):
+    """system_block = STALY prefiks (system + few-shot), identyczny dla wszystkich batchow.
+    Z cache=True dostaje cache_control 'ephemeral' -> Anthropic cache'uje ten prefiks i
+    przy kolejnych batchach liczy go ~90% taniej (cache_read zamiast pelnego inputu).
+    Cache zyje ~5 min, wiec dziala dla serii batchow tego samego i kolejnych konceptow."""
     import anthropic  # lazy import - tylko gdy realne wywolanie
     client = anthropic.Anthropic(api_key=api_key)
+    if cache:
+        system = [{"type": "text", "text": system_block,
+                   "cache_control": {"type": "ephemeral"}}]
+    else:
+        system = system_block
     resp = client.messages.create(
         model=model, max_tokens=MAX_TOKENS, temperature=temperature,
         system=system, messages=[{"role": "user", "content": user}],
     )
-    return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+    usage = getattr(resp, "usage", None)
+    text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+    return text, usage
 
 
 def now():
@@ -192,12 +221,14 @@ def main():
     ap.add_argument("--concept-id", default=None, help="pojedynczy concept_id (zamiast --eco-task)")
     ap.add_argument("--per-concept", type=int, default=None,
                     help="ile pytan na koncept (domyslnie = n_pytan_docelowo z blueprintu)")
-    ap.add_argument("--batch-size", type=int, default=5)
+    ap.add_argument("--batch-size", type=int, default=7)
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--temperature", type=float, default=None,
                     help="domyslnie 0.3 dla calculation, 0.7 dla reszty")
     ap.add_argument("--dry-run", action="store_true", help="skladaj i zapisz prompty, BEZ API")
     ap.add_argument("--force", action="store_true", help="nadpisz istniejace partie")
+    ap.add_argument("--no-cache", action="store_true",
+                    help="wylacz prompt caching stalego prefiksu (domyslnie wlaczony)")
     args = ap.parse_args()
 
     concepts = load_concepts()
@@ -214,6 +245,9 @@ def main():
     template = (PROMPTS / "user_prompt_template.txt").read_text(encoding="utf-8")
     fewshot = json.load((PROMPTS / "fewshot.json").open(encoding="utf-8"))
     fewshot_text = json.dumps(fewshot, ensure_ascii=False, indent=2)
+    # STALY prefiks (system + few-shot) - identyczny dla KAZDEGO batcha => cache'owalny.
+    system_block = build_system_block(system, fewshot_text)
+    use_cache = not args.no_cache
 
     env = load_env()
     api_key = env.get("ANTHROPIC_API_KEY") or ""
@@ -226,8 +260,11 @@ def main():
 
     total_target = 0
     total_made = 0
+    usage_tot = {"input": 0, "cache_create": 0, "cache_read": 0, "output": 0}
+    cache_note = "cache ON" if use_cache else "cache OFF"
     print(f"[B] Koncepty: {len(concepts)} (filtr: {args.concept_id or args.eco_task}) | "
-          f"tryb: {'DRY-RUN' if args.dry_run else 'API '+args.model}")
+          f"tryb: {'DRY-RUN' if args.dry_run else 'API '+args.model} | batch={args.batch_size} | "
+          f"{cache_note}")
 
     for c in concepts:
         per = args.per_concept if args.per_concept else int(c["n_pytan_docelowo"])
@@ -243,12 +280,14 @@ def main():
             if n <= 0:
                 break
             total_target += n
-            user = build_user_prompt(template, fewshot_text, c, chunk_text, gloss, n)
+            user = build_user_prompt(template, c, chunk_text, gloss, n)
             tag = f"{c['concept_id']}_b{b+1}"
 
             if args.dry_run:
+                # SYSTEM = staly, cache'owalny prefiks (system + few-shot); USER = zmienna czesc.
                 (OUT_DRYRUN / f"{tag}.txt").write_text(
-                    f"==== SYSTEM ====\n{system}\n\n==== USER ====\n{user}\n",
+                    f"==== SYSTEM (staly prefiks, cache'owalny) ====\n{system_block}\n\n"
+                    f"==== USER (zmienna czesc) ====\n{user}\n",
                     encoding="utf-8")
                 continue
 
@@ -259,7 +298,8 @@ def main():
                 total_made += len(arr)
                 continue
             try:
-                raw = call_anthropic(api_key, args.model, temp, system, user)
+                raw, usage = call_anthropic(api_key, args.model, temp, system_block,
+                                            user, cache=use_cache)
                 arr = extract_json_array(raw)
                 stamp = f"v2-{datetime.now().strftime('%Y-%m')}"
                 for q in arr:
@@ -269,11 +309,18 @@ def main():
                     q["_chunk_ids"] = chunk_ids
                 out_file.write_text(json.dumps(arr, ensure_ascii=False, indent=2),
                                     encoding="utf-8")
+                u = {"input": getattr(usage, "input_tokens", 0) or 0,
+                     "cache_create": getattr(usage, "cache_creation_input_tokens", 0) or 0,
+                     "cache_read": getattr(usage, "cache_read_input_tokens", 0) or 0,
+                     "output": getattr(usage, "output_tokens", 0) or 0}
+                for k in usage_tot:
+                    usage_tot[k] += u[k]
                 (RUNS / f"{tag}_{now()}.log").write_text(
-                    f"MODEL={args.model} TEMP={temp}\n\nUSER:\n{user}\n\nRAW:\n{raw}\n",
+                    f"MODEL={args.model} TEMP={temp} USAGE={u}\n\nUSER:\n{user}\n\nRAW:\n{raw}\n",
                     encoding="utf-8")
                 total_made += len(arr)
-                print(f"  OK {tag}: {len(arr)} pytan")
+                print(f"  OK {tag}: {len(arr)} pytan | tok in={u['input']} "
+                      f"cache_w={u['cache_create']} cache_r={u['cache_read']} out={u['output']}")
             except Exception as e:
                 print(f"  BLAD {tag}: {e}")
                 (RUNS / f"{tag}_{now()}_ERROR.log").write_text(str(e), encoding="utf-8")
@@ -285,6 +332,13 @@ def main():
     else:
         print(f"[B] Wygenerowano ~{total_made} pytan (cel: {total_target}) -> "
               f"{OUT_BATCHES.relative_to(REPO)}")
+        print(f"[B] Tokeny lacznie: input={usage_tot['input']} "
+              f"cache_write={usage_tot['cache_create']} cache_read={usage_tot['cache_read']} "
+              f"output={usage_tot['output']}")
+        billed = usage_tot["cache_read"]
+        if billed:
+            # cache_read liczone ~0.1x ceny inputu -> pokaz ile "swiezego" inputu zaoszczedzono
+            print(f"[B] Cache: {billed} tokenow odczytanych z cache (~90% taniej niz swiezy input)")
 
 
 if __name__ == "__main__":
