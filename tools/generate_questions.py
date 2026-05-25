@@ -61,7 +61,19 @@ def load_concepts():
 
 
 def load_chunks():
-    return [json.loads(l) for l in (CORPUS / "pmbok_chunks.jsonl").open(encoding="utf-8")]
+    """Wczytuje OBA korpusy: PMBOK + Agile. Kazdemu chunkowi nadaje pole 'source'
+    ('pmbok'|'agile') wg prefiksu chunk_id, by chunks_for_concept() mogl trafic do
+    wlasciwego zrodla (strony 16-153 wystepuja w obu PDF-ach)."""
+    out = []
+    for fname, src in (("pmbok_chunks.jsonl", "pmbok"), ("agile_chunks.jsonl", "agile")):
+        path = CORPUS / fname
+        if not path.exists():               # Agile opcjonalny (pula zwinna)
+            continue
+        for line in path.open(encoding="utf-8"):
+            c = json.loads(line)
+            c["source"] = "agile" if c["chunk_id"].startswith("agile-") else "pmbok"
+            out.append(c)
+    return out
 
 
 def load_glossary():
@@ -77,8 +89,15 @@ def parse_range(s):
 def chunks_for_concept(concept, chunks):
     lo, hi = parse_range(concept["pmbok_pages"])
     ka = concept["ka_tag"]
+    # Zrodlo konceptu: kolumna 'source' z concept_map (brak/puste => 'pmbok' dla
+    # wstecznej zgodnosci). Dobieramy chunki TYLKO z tego korpusu - strony 16-153
+    # wystepuja w obu PDF-ach, wiec sam zakres stron nie wystarcza.
+    src = (concept.get("source") or "pmbok").strip().lower()
+    label = "AGILE" if src == "agile" else "PMBOK"
     scored = []
     for c in chunks:
+        if c.get("source", "pmbok") != src:     # tylko wlasciwy korpus
+            continue
         clo, chi = c["pages"][0], c["pages"][1]
         if chi < lo or clo > hi:        # brak nakladki stron
             continue
@@ -97,7 +116,7 @@ def chunks_for_concept(concept, chunks):
             break
     if not picked and scored:
         picked = [scored[0][1]]
-    text = "\n\n".join(f"[PMBOK s.{c['pages'][0]}-{c['pages'][1]}, {c['section']}]\n{c['text']}"
+    text = "\n\n".join(f"[{label} s.{c['pages'][0]}-{c['pages'][1]}, {c['section']}]\n{c['text']}"
                        for c in picked)
     return text[:CHUNK_WORD_BUDGET * 8], [c["chunk_id"] for c in picked]
 

@@ -136,6 +136,53 @@ const StreakManager = {
       return { date: key, status: data[key] || 'none' };
     });
   },
+  getMonthData(year, month) {
+    const data = Storage.getStreakData();
+    const todayKey = TODAY();
+    const today = new Date();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const firstDow = (firstDay.getDay() + 6) % 7;
+    const days = [];
+    for (let i = 0; i < firstDow; i++) days.push({ type: 'padding' });
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      const current = new Date(year, month, d);
+      const key = current.toISOString().slice(0, 10);
+      const isToday = key === todayKey;
+      const isFuture = current > today && !isToday;
+      let status = 'none';
+      if (isFuture) status = 'future';
+      else if (data[key] === 'daily') status = 'done';
+      else if (data[key] === 'activity') status = 'activity';
+      else if (isToday) status = 'today';
+      days.push({ type: 'day', dayNum: d, date: key, status, isToday });
+    }
+    return days;
+  },
+  getActiveMonths() {
+    const data = Storage.getStreakData();
+    const keys = Object.keys(data).sort();
+    const months = new Set();
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months.add(fmt(now));
+    months.add(fmt(prev));
+    keys.forEach(k => months.add(k.slice(0, 7)));
+    return Array.from(months).sort(); // Sort chronologically (oldest to newest)
+  },
+  getDayDetails(dateKey) {
+    const h = Storage.getHistory();
+    const dayEntries = h.filter(r => r.date === dateKey);
+    if (!dayEntries.length) return null;
+    const counts = {};
+    dayEntries.forEach(r => { counts[r.mode] = (counts[r.mode] || 0) + 1; });
+    const modeNames = { daily: 'Daily Challenge', quick: 'Quick Quiz', standard: 'Standard Quiz', weak: 'Weak Questions', trial: 'Trial Exam' };
+    return Object.entries(counts).map(([mode, count]) => {
+      const name = modeNames[mode] || mode;
+      return `${count}x ${name}`;
+    });
+  },
 };
 
 const BADGES_DEF = [
@@ -384,6 +431,39 @@ test('markActivityDone does not overwrite daily', () => {
   assert(StreakManager.isDailyDoneToday());
 });
 
+test('getMonthData basic check', () => {
+  const monthData = StreakManager.getMonthData(2024, 0); // Jan 2024 (starts on Mon)
+  assert(monthData[0].type === 'day' && monthData[0].dayNum === 1, 'Jan 1 2024 should be Mon (no padding)');
+  assert(monthData.length === 31, 'Jan should have 31 days');
+});
+
+test('getActiveMonths basic check', () => {
+  const activeMonths = StreakManager.getActiveMonths();
+  assert(activeMonths.length >= 2, 'Should at least contain current and previous month');
+
+  const now = new Date();
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+  assert(activeMonths.includes(fmt(now)), 'Should contain current month');
+  assert(activeMonths.includes(fmt(prev)), 'Should contain previous month');
+
+  // Check sorting
+  assert(activeMonths[0] <= activeMonths[activeMonths.length-1], 'Should be sorted chronologically');
+});
+
+test('getDayDetails basic check', () => {
+  reset();
+  const date = TODAY();
+  Storage.saveResult({ date, mode: 'daily', correct: 1, total: 1, percent: 100 });
+  Storage.saveResult({ date, mode: 'quick', correct: 8, total: 10, percent: 80 });
+
+  const details = StreakManager.getDayDetails(date);
+  assert(details.length === 2, 'Should have 2 types of activity');
+  assert(details.some(d => d.includes('Daily Challenge')), 'Should mention Daily Challenge');
+  assert(details.some(d => d.includes('Quick Quiz')), 'Should mention Quick Quiz');
+});
+
 // ===== BADGE MANAGER TESTS =====
 console.log('\nBadgeManager:');
 test('buildStats calculates totalQuizzes from history', () => {
@@ -404,8 +484,9 @@ test('checkAndUnlock unlocks badge when condition met', () => {
 console.log('\nStatsManager:');
 test('getAvg calculates average percent', () => {
   reset();
-  Storage.saveResult({ date: '2026-01-01', percent: 80, total: 10 });
-  Storage.saveResult({ date: '2026-01-02', percent: 90, total: 10 });
+  const today = new Date().toISOString().split('T')[0];
+  Storage.saveResult({ date: today, percent: 80, total: 10 });
+  Storage.saveResult({ date: today, percent: 90, total: 10 });
   const avg = StatsManager.getAvg(10);
   assertEqual(avg, 85);
 });

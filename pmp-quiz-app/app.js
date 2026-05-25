@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-d97b81b1';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-6f61ef65';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -126,6 +126,11 @@ const I18N = {
   auto_scroll_aria:   { pl: 'Włącz automatyczne przewijanie',   en: 'Enable auto-scroll' },
   app_language:       { pl: 'Język aplikacji',                  en: 'App language' },
   app_language_desc:  { pl: 'Język całej aplikacji i pytań',    en: 'Language of the whole app and questions' },
+  theme:              { pl: 'Motyw',                            en: 'Theme' },
+  theme_desc:         { pl: 'Jasny, ciemny lub systemowy',      en: 'Light, dark or system theme' },
+  theme_light:        { pl: 'Jasny',                            en: 'Light' },
+  theme_dark:         { pl: 'Ciemny',                           en: 'Dark' },
+  theme_auto:         { pl: 'Auto',                             en: 'Auto' },
   sign_out:           { pl: 'Wyloguj się',                      en: 'Sign out' },
   privacy_policy:     { pl: 'Polityka prywatności ↗',           en: 'Privacy policy ↗' },
   sign_out_confirm:   { pl: 'Wylogować się?',                   en: 'Sign out?' },
@@ -183,8 +188,29 @@ const I18N = {
   quizzes:            { pl: 'Quizy',                            en: 'Quizzes' },
   questions:          { pl: 'Pytania',                          en: 'Questions' },
   per_domain:         { pl: 'Per domena',                       en: 'Per domain' },
-  activity_30:        { pl: 'Aktywność (30 dni)',               en: 'Activity (30 days)' },
+  activity_30:        { pl: 'Aktywność',                        en: 'Activity' },
+  activity_history:   { pl: 'Historia aktywności',              en: 'Activity History' },
   badges:             { pl: 'Odznaki',                          en: 'Badges' },
+  // Calendar
+  day_0: { pl: 'Niedziela', en: 'Sunday' },
+  day_1: { pl: 'Poniedziałek', en: 'Monday' },
+  day_2: { pl: 'Wtorek', en: 'Tuesday' },
+  day_3: { pl: 'Środa', en: 'Wednesday' },
+  day_4: { pl: 'Czwartek', en: 'Thursday' },
+  day_5: { pl: 'Piątek', en: 'Friday' },
+  day_6: { pl: 'Sobota', en: 'Saturday' },
+  month_0: { pl: 'Styczeń', en: 'January' },
+  month_1: { pl: 'Luty', en: 'February' },
+  month_2: { pl: 'Marzec', en: 'March' },
+  month_3: { pl: 'Kwiecień', en: 'April' },
+  month_4: { pl: 'Maj', en: 'May' },
+  month_5: { pl: 'Czerwiec', en: 'June' },
+  month_6: { pl: 'Lipiec', en: 'July' },
+  month_7: { pl: 'Sierpień', en: 'August' },
+  month_8: { pl: 'Wrzesień', en: 'September' },
+  month_9: { pl: 'Październik', en: 'October' },
+  month_10: { pl: 'Listopad', en: 'November' },
+  month_11: { pl: 'Grudzień', en: 'December' },
   // trial exam (plan 12)
   trial_title:            { pl: 'Trial Exam',                       en: 'Trial Exam' },
   trial_menu_sub:         { pl: 'Symulacja egzaminu PMP na czas',   en: 'Timed PMP exam simulation' },
@@ -251,7 +277,7 @@ const Storage = {
   getUnlockedBadges()   { return this._get('unlocked_badges', []); },
   saveUnlockedBadges(b) { this._set('unlocked_badges', b); },
   getSettings()         {
-    const defaults = { confidenceEnabled: true, autoScrollEnabled: true, defaultLanguage: 'pl' };
+    const defaults = { confidenceEnabled: true, autoScrollEnabled: true, defaultLanguage: 'pl', theme: 'auto' };
     return { ...defaults, ...this._get('settings', {}) };
   },
   saveSettings(s)       { this._set('settings', s); },
@@ -702,6 +728,97 @@ const StreakManager = {
       };
     });
   },
+  getMonthData(year, month) {
+    const data = Storage.getStreakData();
+    const todayKey = TODAY();
+    const today = new Date();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    // Dzień tygodnia pierwszego dnia (0=Pn, 6=Nd)
+    const firstDow = (firstDay.getDay() + 6) % 7;
+
+    const days = [];
+    // Padding na początku
+    for (let i = 0; i < firstDow; i++) {
+      days.push({ type: 'padding' });
+    }
+
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      const current = new Date(year, month, d);
+      const key = current.toISOString().slice(0, 10);
+      const isToday = key === todayKey;
+      const isFuture = current > today && !isToday;
+
+      let status = 'none';
+      if (isFuture) status = 'future';
+      else if (data[key] === 'daily') status = 'done';
+      else if (data[key] === 'activity') status = 'activity';
+      else if (isToday) status = 'today';
+      else if (data[key] === undefined && current < today) {
+        // Sprawdzamy czy użytkownik w ogóle był wtedy aktywny (czy data[key] istnieje)
+        // Jeśli nie ma wpisu, to 'none', jeśli jest cokolwiek innego niż daily/activity to 'missed'
+        // Ale StreakManager zazwyczaj zapisuje tylko sukcesy.
+        // Jeśli chcemy pokazać kropkę jako "niezrobione", musimy wiedzieć od kiedy użytkownik ma konto.
+        // Dla uproszczenia: jeśli nie ma w data[key], to 'none'.
+        status = 'none';
+      }
+
+      days.push({
+        type: 'day',
+        dayNum: d,
+        date: key,
+        status,
+        isToday
+      });
+    }
+
+    return days;
+  },
+  getActiveMonths() {
+    const data = Storage.getStreakData();
+    const keys = Object.keys(data).sort();
+    const months = new Set();
+
+    // Zawsze dodaj bieżący i poprzedni miesiąc
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+    months.add(fmt(now));
+    months.add(fmt(prev));
+
+    keys.forEach(k => {
+      months.add(k.slice(0, 7)); // YYYY-MM
+    });
+
+    return Array.from(months).sort(); // Sort chronologically (oldest to newest)
+  },
+  getDayDetails(dateKey) {
+    const h = Storage.getHistory();
+    const dayEntries = h.filter(r => r.date === dateKey);
+    if (!dayEntries.length) return null;
+
+    const counts = {};
+    dayEntries.forEach(r => {
+      counts[r.mode] = (counts[r.mode] || 0) + 1;
+    });
+
+    const modeNames = {
+      daily:    t('daily_challenge'),
+      quick:    t('quick_quiz'),
+      standard: t('standard_quiz'),
+      weak:     t('weak_questions'),
+      trial:    t('trial_title')
+    };
+
+    return Object.entries(counts).map(([mode, count]) => {
+      const name = modeNames[mode] || mode;
+      return `${count}x ${name}`;
+    });
+  },
 };
 
 // ==================== BADGE MANAGER ====================
@@ -895,6 +1012,34 @@ const ReportModal = {
 // ==================== VIEWS ====================
 const Views = {};
 
+// ==================== THEME MANAGER ====================
+const ThemeManager = {
+  init() {
+    this.apply(Storage.getSettings().theme);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (Storage.getSettings().theme === 'auto') this.apply('auto');
+    });
+  },
+  apply(theme) {
+    const root = document.documentElement;
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+
+    root.classList.remove('theme-dark', 'theme-light');
+
+    if (theme === 'dark') {
+      root.classList.add('theme-dark');
+      if (metaTheme) metaTheme.setAttribute('content', '#0f172a');
+    } else if (theme === 'light') {
+      root.classList.add('theme-light');
+      if (metaTheme) metaTheme.setAttribute('content', '#6366f1');
+    } else {
+      // auto
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (metaTheme) metaTheme.setAttribute('content', isDark ? '#0f172a' : '#6366f1');
+    }
+  }
+};
+
 // ==================== ROUTER ====================
 const App = {
   currentView: 'loading',
@@ -917,6 +1062,7 @@ const App = {
   },
 
   async init() {
+    ThemeManager.init();
     // Apply saved language before the first paint so the loading/login screens are localized too
     AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
     this.navigate('loading');
@@ -1233,11 +1379,29 @@ Views.home = {
               <div class="settings-row__desc">${t('app_language_desc')}</div>
             </div>
           </div>
-          <div class="settings-lang-select">
+          <div class="lang-pill-toggle">
             <button class="btn-lang-opt ${settings.defaultLanguage === 'en' ? '' : 'active'}"
-                    onclick="Views.home._setLang('pl')">🇵🇱 PL</button>
+                    onclick="Views.home._setLang('pl')">PL</button>
             <button class="btn-lang-opt ${settings.defaultLanguage === 'en' ? 'active' : ''}"
-                    onclick="Views.home._setLang('en')">🇬🇧 EN</button>
+                    onclick="Views.home._setLang('en')">EN</button>
+          </div>
+        </div>
+        <div class="settings-separator"></div>
+        <div class="settings-row">
+          <div class="settings-row__info">
+            <span class="settings-row__icon">🌓</span>
+            <div>
+              <div class="settings-row__label">${t('theme')}</div>
+              <div class="settings-row__desc">${t('theme_desc')}</div>
+            </div>
+          </div>
+          <div class="theme-pill-toggle">
+            <button class="btn-theme-opt ${settings.theme === 'light' ? 'active' : ''}"
+                    onclick="Views.home._setTheme('light')">${t('theme_light')}</button>
+            <button class="btn-theme-opt ${settings.theme === 'auto' ? 'active' : ''}"
+                    onclick="Views.home._setTheme('auto')">${t('theme_auto')}</button>
+            <button class="btn-theme-opt ${settings.theme === 'dark' ? 'active' : ''}"
+                    onclick="Views.home._setTheme('dark')">${t('theme_dark')}</button>
           </div>
         </div>
         <div class="settings-separator"></div>
@@ -1279,6 +1443,16 @@ Views.home = {
     // then reopen the modal so its labels + active button reflect the change
     Views.home._closeSettings();
     App.render();
+    Views.home._openSettings();
+  },
+
+  _setTheme(theme) {
+    const s = Storage.getSettings();
+    s.theme = theme;
+    Storage.saveSettings(s);
+    ThemeManager.apply(theme);
+    SupabaseSync.pushProgress().catch(console.error);
+    Views.home._closeSettings();
     Views.home._openSettings();
   },
 
@@ -1350,7 +1524,6 @@ Views['mode-select'] = {
 
     return `
       <div class="screen mode-select">
-        <button class="btn-back" onclick="App.navigate('home')">${t('back')}</button>
         <h2>${t('quick_quiz')}</h2>
         <div class="mode-card ${self._selectedMode === 'quick' ? 'selected' : ''}"
              onclick="Views['mode-select']._selectMode('quick')">
@@ -1370,6 +1543,7 @@ Views['mode-select'] = {
                 onclick="Views['mode-select']._startQuiz()">
           ${t('start')}
         </button>
+        <button class="btn-gray" onclick="App.navigate('home')">${t('back')}</button>
       </div>`;
   },
 
@@ -1454,11 +1628,11 @@ Views['trial-setup'] = {
       </div>`).join('');
     return `
       <div class="screen trial-setup">
-        <button class="btn-back" onclick="App.navigate('home')">${t('back')}</button>
         <h2>${t('trial_title')}</h2>
         <p class="trial-intro">${t('trial_intro')}</p>
         <div class="trial-variants">${cards}</div>
         <button class="btn-primary" onclick="Views['trial-setup']._start()">${t('trial_start')}</button>
+        <button class="btn-gray" onclick="App.navigate('home')">${t('back')}</button>
       </div>`;
   },
 
@@ -1795,7 +1969,7 @@ Views['trial-result'] = {
     return `
       <div class="screen trial-result">
         <div class="trial-result__head">
-          <button class="btn-back" onclick="App.navigate('home')">${t('back')}</button>
+          <div style="flex:1"></div>
           ${langToggle}
         </div>
         <h2 class="trial-result__title">${t('trial_result_title')}</h2>
@@ -2210,22 +2384,66 @@ function launchConfetti() {
 }
 
 // ==================== BADGE POPUP ====================
-function showBadgePopup(badge) {
+function showBadgePopup(badge, isInfo = false) {
   const popup = document.getElementById('badge-popup');
+
+  // Intercept all clicks to prevent underlying actions while popup is active
+  let backdrop = document.getElementById('badge-popup-backdrop');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.id = 'badge-popup-backdrop';
+    backdrop.style.cssText = 'position:fixed;inset:0;z-index:999;';
+    document.body.appendChild(backdrop);
+  }
+
+  const hide = () => {
+    if (window._badgePopupTimeout) clearTimeout(window._badgePopupTimeout);
+    popup.classList.remove('visible');
+    backdrop.style.display = 'none';
+    if (window._badgePopupHideTimeout) clearTimeout(window._badgePopupHideTimeout);
+    window._badgePopupHideTimeout = setTimeout(() => popup.classList.add('hidden'), 400);
+  };
+
+  backdrop.style.display = 'block';
+  backdrop.onclick = (e) => {
+    e.stopPropagation();
+    hide();
+  };
+
+  // Clicking on the popup itself should also close it
+  popup.onclick = (e) => {
+    e.stopPropagation();
+    hide();
+  };
+
   popup.classList.remove('hidden');
+
   const bName = AppState.showEnglish ? (badge.name_en || badge.name) : badge.name;
   const bDesc = AppState.showEnglish ? (badge.desc_en || badge.desc) : badge.desc;
+
+  let title, desc;
+  if (isInfo) {
+    title = bName;
+    desc = bDesc;
+  } else {
+    title = t('badge_unlocked');
+    desc = `${bName} — ${bDesc}`;
+  }
+
   popup.innerHTML = `
     <div class="badge-popup__emoji">${badge.emoji}</div>
     <div class="badge-popup__text">
-      <strong>${t('badge_unlocked')}</strong>
-      <span>${bName} — ${bDesc}</span>
+      <strong>${title}</strong>
+      <span>${desc}</span>
     </div>`;
-  popup.classList.add('visible');
-  setTimeout(() => {
-    popup.classList.remove('visible');
-    setTimeout(() => popup.classList.add('hidden'), 400);
-  }, 2200);
+
+  if (window._badgePopupTimeout) clearTimeout(window._badgePopupTimeout);
+  if (window._badgePopupHideTimeout) clearTimeout(window._badgePopupHideTimeout);
+
+  // Trigger visual transition
+  requestAnimationFrame(() => popup.classList.add('visible'));
+
+  window._badgePopupTimeout = setTimeout(hide, isInfo ? 4000 : 2200);
 }
 
 // ==================== SUMMARY VIEW ====================
@@ -2298,7 +2516,12 @@ Views.stats = {
     const totals = StatsManager.getTotals();
     const perDomain = StatsManager.getPerDomain(AppState.questions);
     const unlocked = Storage.getUnlockedBadges();
-    const days = StreakManager.getLast30Days();
+
+    const now = new Date();
+    const dayName = t('day_' + now.getDay());
+    const monthName = t('month_' + now.getMonth());
+    const fullDate = `${now.getDate()} ${monthName} ${now.getFullYear()}, ${dayName}`;
+    const monthGrid = this._renderMonthGrid(now.getFullYear(), now.getMonth());
 
     const avgVal = v => v !== null ? `${v}%` : '—';
     const domainBars = perDomain.map(d => `
@@ -2311,18 +2534,13 @@ Views.stats = {
       </div>`).join('');
 
     const badgeItems = BADGES_DEF.map(b => `
-      <div class="badge-item ${unlocked.includes(b.id) ? '' : 'locked'}">
+      <div class="badge-item ${unlocked.includes(b.id) ? '' : 'locked'}" onclick="Views.stats._showBadgeInfo('${b.id}')">
         <div class="badge-item__emoji">${b.emoji}</div>
         <div class="badge-item__name">${AppState.showEnglish ? (b.name_en || b.name) : b.name}</div>
       </div>`).join('');
 
-    const calDots = days.map(d =>
-      `<div class="streak-dot streak-dot--${d.status}" title="${d.date}"></div>`
-    ).join('');
-
     return `
       <div class="screen stats">
-        <button class="btn-back" onclick="App.navigate('home')">${t('back')}</button>
         <h1>${t('statistics')}</h1>
 
         <div class="stats-card">
@@ -2363,16 +2581,145 @@ Views.stats = {
           ${domainBars}
         </div>` : ''}
 
-        <div class="stats-card">
+        <div class="stats-card stats-card--activity" onclick="Views.stats._openFullCalendar()">
           <h3>${t('activity_30')}</h3>
-          <div class="streak-dots">${calDots}</div>
+          <div class="activity-header">
+            <span class="activity-date">${fullDate}</span>
+          </div>
+          <div class="calendar-grid">
+            ${this._renderDayLabels()}
+            ${monthGrid}
+          </div>
         </div>
 
         <div class="stats-card">
           <h3>${t('badges')}</h3>
           <div class="badges-grid">${badgeItems}</div>
         </div>
+        <button class="btn-gray" onclick="App.navigate('home')">${t('back')}</button>
       </div>`;
+  },
+
+  _renderDayLabels() {
+    const labels = AppState.showEnglish
+      ? ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+      : ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+    return labels.map(l => `<div class="calendar-label">${l}</div>`).join('');
+  },
+
+  _showBadgeInfo(badgeId) {
+    const badge = BADGES_DEF.find(b => b.id === badgeId);
+    if (badge) showBadgePopup(badge, true);
+  },
+
+  _renderMonthGrid(year, month) {
+    const days = StreakManager.getMonthData(year, month);
+    return days.map(d => {
+      if (d.type === 'padding') return `<div class="calendar-cell padding"></div>`;
+
+      const hasActivity = d.status === 'done' || d.status === 'activity';
+      const onClick = hasActivity ? `onclick="event.stopPropagation(); Views.stats._showDayDetails('${d.date}', this)"` : '';
+      const style = hasActivity ? 'cursor: pointer;' : '';
+
+      return `<div class="calendar-cell calendar-cell--${d.status} ${d.isToday ? 'today' : ''}"
+                   title="${d.date}" ${onClick} style="${style}">
+                ${d.dayNum}
+              </div>`;
+    }).join('');
+  },
+
+  _showDayDetails(dateKey, el) {
+    // 1. Usuń istniejące tooltipy
+    document.querySelectorAll('.activity-tooltip').forEach(t => t.remove());
+
+    const details = StreakManager.getDayDetails(dateKey);
+    if (!details) return;
+
+    // 2. Utwórz tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'activity-tooltip';
+    tooltip.innerHTML = `
+      <div class="activity-tooltip__title">${dateKey}</div>
+      <div class="activity-tooltip__list">
+        ${details.map(d => `<div class="activity-tooltip__item">${d}</div>`).join('')}
+      </div>
+      <div class="activity-tooltip__arrow"></div>
+    `;
+
+    // 3. Przypnij go do komórki kalendarza
+    el.appendChild(tooltip);
+
+    // 4. Auto-pozycjonowanie, by tooltip nie wychodził poza ekran
+    const rect = tooltip.getBoundingClientRect();
+    const arrow = tooltip.querySelector('.activity-tooltip__arrow');
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const padding = 10;
+
+    let shiftX = 0;
+    if (rect.right > winW - padding) {
+      shiftX = rect.right - winW + padding;
+    } else if (rect.left < padding) {
+      shiftX = rect.left - padding;
+    }
+
+    if (shiftX !== 0) {
+      // Przesuwamy tooltip, by zmieścił się w poziomie
+      tooltip.style.transform = `translateX(calc(-50% - ${shiftX}px)) translateY(8px)`;
+      // Przesuwamy strzałkę w przeciwną stronę, by nadal celowała w środek dnia
+      if (arrow) arrow.style.left = `calc(50% + ${shiftX}px)`;
+    }
+
+    // Sprawdzenie czy nie wychodzi dołem
+    if (rect.bottom > winH - padding) {
+      tooltip.classList.add('activity-tooltip--top');
+      // Zamień translateY na ujemne
+      const currentTransform = tooltip.style.transform || 'translateX(-50%) translateY(8px)';
+      tooltip.style.transform = currentTransform.replace('translateY(8px)', 'translateY(-8px)');
+    }
+
+    // 5. Mechanizm zamykania przez kliknięcie gdziekolwiek
+    const hide = (e) => {
+      // Nie zamykaj, jeśli kliknięto wewnątrz samego tooltipa (pozwala np. zaznaczyć tekst)
+      if (e && tooltip.contains(e.target)) return;
+
+      tooltip.remove();
+      document.removeEventListener('click', hide, true);
+    };
+
+    // Timeout zapobiega natychmiastowemu zamknięciu przez ten sam klik, który otworzył tooltip
+    setTimeout(() => document.addEventListener('click', hide, true), 10);
+  },
+
+  _openFullCalendar() {
+    const months = StreakManager.getActiveMonths();
+    const content = months.map(m => {
+      const [year, month] = m.split('-').map(Number);
+      const monthName = t('month_' + (month - 1));
+      return `
+        <div class="full-calendar-month">
+          <div class="full-calendar-month-title">${monthName} ${year}</div>
+          <div class="calendar-grid">
+            ${this._renderDayLabels()}
+            ${this._renderMonthGrid(year, month - 1)}
+          </div>
+        </div>`;
+    }).join('');
+
+    const modal = document.createElement('div');
+    modal.className = 'calendar-modal';
+    modal.innerHTML = `
+      <div class="calendar-modal__card">
+        <div class="calendar-modal__header">
+          <span>${t('activity_history')}</span>
+          <button class="calendar-modal__close" onclick="this.closest('.calendar-modal').remove()">×</button>
+        </div>
+        <div class="calendar-modal__body">
+          ${content}
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   },
 
   init() {

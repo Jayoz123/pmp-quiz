@@ -54,24 +54,25 @@
       padding: 20px 16px 32px;
     }
 
-    /* ===== BACK BUTTON (from app.js styles) ===== */
-    .btn-back {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.9rem;
-      color: var(--text2);
-      margin-bottom: 20px;
+    /* ===== GRAY BUTTON (matches app's btn-gray) ===== */
+    .btn-gray {
+      display: block;
+      width: 100%;
+      padding: 14px;
       background: var(--surface2);
+      color: var(--text);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.2s;
+      text-align: center;
       border: none;
       cursor: pointer;
-      padding: 8px 14px 8px 10px;
-      border-radius: var(--radius-xs);
-      font-weight: 500;
+      font-family: inherit;
+      margin-top: 16px;
       text-decoration: none;
-      transition: background 0.2s, color 0.2s;
     }
-    .btn-back:hover { background: var(--border); color: var(--text); }
+    .btn-gray:active { transform: scale(0.98); background: var(--border); }
 
     /* ===== HEADER (matching app's logo/header style) ===== */
     header {
@@ -143,13 +144,6 @@
 <body class="lang-pl">
 
 <div class="screen">
-  <nav>
-    <a href="./index.html" class="btn-back">
-      <span lang="pl">‹ Wróć do aplikacji</span>
-      <span lang="en">‹ Back to app</span>
-    </a>
-  </nav>
-
   <header>
     <h1 lang="pl">📋 Polityka Prywatności</h1>
     <h1 lang="en">📋 Privacy Policy</h1>
@@ -262,6 +256,11 @@
   <footer>
     <p>© 2026 Bartosz Stolarski · PMP Quiz</p>
   </footer>
+
+  <a href="./index.html" class="btn-gray">
+    <span lang="pl">Wróć do aplikacji</span>
+    <span lang="en">Back to app</span>
+  </a>
 </div>
 
 <script>

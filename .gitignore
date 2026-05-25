@@ -25,6 +25,7 @@ Thumbs.db
 # ── Faza A planu 13: korpus PMBOK + artefakty pipeline'u generowania pytań ──
 # UWAGA: corpus/ zawiera tekst PMBOK (prawa autorskie PMI) oraz spersonalizowany
 # znak wodny "Licensed To" z pmbok_raw.jsonl — NIE commitować.
+reports/
 corpus/
 out/
 runs/

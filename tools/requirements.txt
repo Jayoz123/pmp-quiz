@@ -3,8 +3,14 @@
 pdfplumber==0.11.4
 openpyxl==3.1.2
 pytest==8.2.0
-Pillow==10.3.0
+Pillow>=11.0.0
 
-# ── Faza A planu 13 (prep_pmbok.py): odszyfrowanie + ekstrakcja PMBOK ──
+# ── Faza A planu 13 (prep_pmbok.py + prep_agile.py): ekstrakcja PMBOK/Agile ──
+# pikepdf: decrypt PMBOK (Agile jest niezaszyfrowany). PyMuPDF: ekstrakcja tekstu/TOC.
 pikepdf==10.5.1
 PyMuPDF==1.27.2.3
+
+# ── Faza B planu 13 (generate_questions.py / validate --review): klient API ──
+# Wymagane do trybu wsadowego (API). Brak tego pakietu wywrócił M1
+# ("No module named 'anthropic'") — patrz §4.0 planu. Zweryfikowane na 0.104.1.
+anthropic>=0.69,<1.0
