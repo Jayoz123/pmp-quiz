@@ -53,6 +53,9 @@ def q_tokens(q):
 def main():
     ap = argparse.ArgumentParser(description="Faza C.4 - deduplikacja")
     ap.add_argument("--input", default=str(OUT / "validated.jsonl"))
+    ap.add_argument("--output", default=str(OUT / "deduped.jsonl"),
+                    help="plik wyjsciowy (osobny dla Agile, by nie nadpisac PMBOK)")
+    ap.add_argument("--flags-out", default=str(OUT / "dedup_flags.csv"))
     ap.add_argument("--threshold", type=float, default=THRESHOLD)
     args = ap.parse_args()
 
@@ -86,10 +89,12 @@ def main():
         kept.append(q)
         kept_tok.append(t)
 
-    (OUT / "deduped.jsonl").write_text(
+    out_path = Path(args.output)
+    flags_path = Path(args.flags_out)
+    out_path.write_text(
         "\n".join(json.dumps(q, ensure_ascii=False) for q in kept) + ("\n" if kept else ""),
         encoding="utf-8")
-    with (OUT / "dedup_flags.csv").open("w", encoding="utf-8-sig", newline="") as f:
+    with flags_path.open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["idx", "kind", "similarity", "source_concept", "question"])
         for i, q, kind, s in flags:
@@ -98,7 +103,7 @@ def main():
     print(f"[C.4] Zachowano {len(kept)} | usunieto {len(flags)} "
           f"(vs-stare: {sum(1 for x in flags if x[2]=='near-old')}, "
           f"vs-nowe: {sum(1 for x in flags if x[2]=='dup-new')})")
-    print(f"[C.4] -> {(OUT/'deduped.jsonl').relative_to(REPO)} , {(OUT/'dedup_flags.csv').relative_to(REPO)}")
+    print(f"[C.4] -> {out_path} , {flags_path}")
 
 
 if __name__ == "__main__":

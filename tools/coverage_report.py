@@ -27,6 +27,13 @@ REPORTS = REPO / "reports"
 ECO_TARGET = {"People": 42, "Process": 50, "Business Environment": 8}
 
 
+def _rel(p):
+    try:
+        return p.relative_to(REPO)
+    except ValueError:
+        return p
+
+
 def bar(pct, width=24):
     n = int(round(pct / 100 * width))
     return "#" * n + "." * (width - n)
@@ -48,8 +55,8 @@ def main():
     ap.add_argument("--input", default=None)
     args = ap.parse_args()
 
-    src = Path(args.input) if args.input else (
-        OUT / "deduped.jsonl" if (OUT / "deduped.jsonl").exists() else OUT / "validated.jsonl")
+    src = (Path(args.input).resolve() if args.input else (
+        OUT / "deduped.jsonl" if (OUT / "deduped.jsonl").exists() else OUT / "validated.jsonl"))
     if not src.exists():
         raise SystemExit(f"Brak {src}")
     qs = [json.loads(l) for l in src.read_text(encoding="utf-8").splitlines() if l.strip()]
@@ -70,7 +77,7 @@ def main():
             cm[r["concept_id"]] = int(r["n_pytan_docelowo"])
 
     md = [f"# Raport pokrycia (C.5)", "",
-          f"Zrodlo: `{src.relative_to(REPO)}` | pytan: **{n}**", "",
+          f"Zrodlo: `{_rel(src)}` | pytan: **{n}**", "",
           dist_table("ECO domena (cel: People 42 / Process 50 / BizEnv 8)", eco, n, ECO_TARGET),
           dist_table("Obszar wiedzy (ka_tag / domain)", ka, n),
           dist_table("Trudnosc (cel ~30/50/20)", diff, n,

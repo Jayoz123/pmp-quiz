@@ -110,6 +110,48 @@ def check_ngram(q, pmbok_ng, n):
 
 
 # ---------- C.2 (opcjonalnie) ----------
+import hashlib
+import time
+
+REVIEW_CKPT = OUT / "review_verdicts.jsonl"
+
+
+def qhash(q):
+    """Stabilny klucz pytania (niezalezny od pozycji idx w puli).
+    Liczony z question_en + answers_en, ktore identyfikuja pytanie merytorycznie."""
+    base = (q.get("question_en") or q.get("question") or "")
+    base += "||" + "|".join(q.get("answers_en") or q.get("answers") or [])
+    return hashlib.sha1(base.encode("utf-8")).hexdigest()
+
+
+def load_review_checkpoint():
+    """Wczytuje juz zrecenzowane werdykty z poprzednich (przerwanych) przebiegow.
+    Zwraca dict: qhash -> (verdict, reason). Plik to JSONL append-only."""
+    done = {}
+    if REVIEW_CKPT.exists():
+        for line in REVIEW_CKPT.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                r = json.loads(line)
+                done[r["qhash"]] = (r.get("verdict", "flag"), r.get("reason", ""))
+            except Exception:
+                continue  # pomijamy ewentualny obciety ostatni wiersz
+    return done
+
+
+def _append_ckpt(rows):
+    """Dopisuje partie werdyktow do checkpointu (flush+fsync, by przetrwac crash)."""
+    OUT.mkdir(exist_ok=True)
+    with open(REVIEW_CKPT, "a", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        f.flush()
+        import os
+        os.fsync(f.fileno())
+
+
 def review_batch(questions, env):
     import anthropic
     key = env.get("ANTHROPIC_API_KEY")
@@ -117,26 +159,83 @@ def review_batch(questions, env):
     if not key:
         sys.exit("--review wymaga ANTHROPIC_API_KEY w .env")
     sysp = (PROMPTS / "reviewer_prompt.txt").read_text(encoding="utf-8")
-    payload = [{"idx": i, **{k: q[k] for k in REQUIRED if k in q},
-                "difficulty": q.get("difficulty"), "qtype": q.get("qtype")}
-               for i, q in enumerate(questions)]
     client = anthropic.Anthropic(api_key=key)
-    verdicts = {}
-    for s in range(0, len(payload), 10):
-        batch = payload[s:s + 10]
-        for p in batch:
-            p["idx"] = p["idx"]  # globalny idx zachowany
-        resp = client.messages.create(
-            model=model, max_tokens=2048, temperature=0,
-            system=sysp,
-            messages=[{"role": "user", "content": json.dumps(batch, ensure_ascii=False)}])
-        raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+
+    # 1) WZNAWIANIE: wczytaj juz zrobione, pomijaj je w tym przebiegu.
+    done = load_review_checkpoint()
+    verdicts = {}                      # idx -> (verdict, reason) dla CALEJ puli
+    hash_by_idx = {i: qhash(q) for i, q in enumerate(questions)}
+    for i, q in enumerate(questions):
+        h = hash_by_idx[i]
+        if h in done:
+            verdicts[i] = done[h]      # z checkpointu, bez ponownego wywolania API
+    todo = [i for i in range(len(questions)) if i not in verdicts]
+    if done:
+        print(f"[C.2] checkpoint: {len(verdicts)} juz zrecenzowanych -> wznawiam, "
+              f"do zrobienia {len(todo)}")
+
+    # 2) Pozostale recenzuj partiami po 10; ZAPIS po KAZDEJ partii.
+    for s in range(0, len(todo), 10):
+        idx_batch = todo[s:s + 10]
+        batch = [{"idx": i,
+                  **{k: questions[i][k] for k in REQUIRED if k in questions[i]},
+                  "difficulty": questions[i].get("difficulty"),
+                  "qtype": questions[i].get("qtype")}
+                 for i in idx_batch]
+
+        # retry z backoffem na zerwaniu sieci / rate-limicie
+        raw = None
+        for attempt in range(6):
+            try:
+                resp = client.messages.create(
+                    model=model, max_tokens=2048, temperature=0,
+                    system=sysp,
+                    messages=[{"role": "user",
+                               "content": json.dumps(batch, ensure_ascii=False)}])
+                raw = "".join(b.text for b in resp.content
+                              if getattr(b, "type", "") == "text")
+                break
+            except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
+                wait = min(60, 5 * (attempt + 1))
+                print(f"  [C.2] siec padla ({type(e).__name__}) - retry {attempt+1}/6 "
+                      f"za {wait}s; postep zapisany, mozesz tez przerwac (Ctrl+C) i wznowic")
+                time.sleep(wait)
+            except anthropic.RateLimitError:
+                wait = min(90, 10 * (attempt + 1))
+                print(f"  [C.2] 429 rate-limit - retry {attempt+1}/6 za {wait}s")
+                time.sleep(wait)
+        if raw is None:
+            print(f"  [C.2] partia {s//10+1}: nie udalo sie po 6 probach - "
+                  f"przerywam. Uruchom ponownie, by wznowic od tego miejsca "
+                  f"({len(verdicts)} werdyktow juz w {REVIEW_CKPT.name}).")
+            break
+
         raw = re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.I | re.M)
+        rows = []
         try:
-            for v in json.loads(raw[raw.find("["):raw.rfind("]") + 1]):
-                verdicts[v["idx"]] = (v.get("verdict", "flag"), v.get("reason", ""))
+            parsed = json.loads(raw[raw.find("["):raw.rfind("]") + 1])
         except Exception as e:
             print(f"  recenzent: blad parsowania ({e}) - partia oznaczona do reczu")
+            parsed = []
+        seen_idx = set()
+        for v in parsed:
+            i = v.get("idx")
+            if i is None or i not in idx_batch:
+                continue
+            verdict = v.get("verdict", "flag")
+            reason = v.get("reason", "")
+            verdicts[i] = (verdict, reason)
+            seen_idx.add(i)
+            rows.append({"qhash": hash_by_idx[i], "verdict": verdict, "reason": reason})
+        # pytania, dla ktorych model nic nie zwrocil -> oznacz do reczu (nie tracimy ich)
+        for i in idx_batch:
+            if i not in seen_idx:
+                verdicts[i] = ("flag", "brak werdyktu recenzenta (do reczu)")
+                rows.append({"qhash": hash_by_idx[i], "verdict": "flag",
+                             "reason": "brak werdyktu recenzenta (do reczu)"})
+        _append_ckpt(rows)             # <-- CHECKPOINT po kazdej partii
+        print(f"  [C.2] partia {s//10+1}/{(len(todo)+9)//10}: +{len(rows)} "
+              f"(lacznie {len(verdicts)}/{len(questions)})")
     return verdicts
 
 
@@ -161,10 +260,27 @@ def main():
     files = sorted(glob.glob(args.input))
     if not files:
         sys.exit(f"Brak plikow wejsciowych: {args.input}")
+
+    def _load_questions(fp):
+        """Obsluguje OBA formaty: tablice JSON (.json batche) oraz JSONL (.jsonl,
+        obiekt/linia - np. out/deduped_agile_m2.jsonl). Wczesniej json.load() na JSONL
+        wywalal 'Extra data: line 2'."""
+        txt = Path(fp).read_text(encoding="utf-8").strip()
+        if not txt:
+            return []
+        # JSONL: kazda niepusta linia to osobny obiekt (pierwszy znak '{' a nie '[')
+        if txt.lstrip()[0] != "[":
+            out = []
+            for line in txt.splitlines():
+                line = line.strip()
+                if line:
+                    out.append(json.loads(line))
+            return out
+        return json.load(open(fp, encoding="utf-8"))
+
     questions = []
     for fp in files:
-        arr = json.load(open(fp, encoding="utf-8"))
-        for q in arr:
+        for q in _load_questions(fp):
             q["_src_file"] = Path(fp).name
             questions.append(q)
     print(f"[C] Wczytano {len(questions)} pytan z {len(files)} partii")

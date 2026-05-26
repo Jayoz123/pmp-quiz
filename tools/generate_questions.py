@@ -44,7 +44,8 @@ OUT_DRYRUN = REPO / "out" / "dry_run"
 RUNS = REPO / "runs"
 
 DEFAULT_MODEL = "claude-sonnet-4-6"   # silny model; mozna nadpisac --model (np. claude-opus-4-6)
-MAX_TOKENS = 4096
+MAX_TOKENS = 8192   # podniesione z 4096: batche hard/calculation (dlugie wyjasnienia PL+EN)
+                    # ucinaly sie ~linia 69 -> truncation JSON. 8192 daje zapas.
 CHUNK_WORD_BUDGET = 2600              # ile slow kontekstu PMBOK max wstrzykujemy
 GLOSSARY_MAX = 34
 # Rdzen glosariusza zawsze wstrzykiwany (spojnosc podstawowych terminow):
@@ -179,14 +180,63 @@ def build_user_prompt(template, concept, chunk_text, gloss, n):
 
 
 # ---------- parsowanie odpowiedzi modelu ----------
+def _salvage_objects(body):
+    """Tolerancyjny fallback: skanuje zawartosc tablicy [...] i parsuje KAZDY obiekt
+    {...} najwyzszego poziomu z osobna, omijajac nawiasy/cudzyslowy w stringach. Ratuje
+    poprawne obiekty mimo JEDNEGO zepsutego (trailing comma, niezescape'owany cudzyslow w PL,
+    albo uciecie na max_tokens - wtedy ostatni, niedomkniety obiekt jest pomijany).
+    Zwraca liste sparsowanych obiektow (moze byc pusta)."""
+    objs = []
+    depth = 0
+    in_str = False
+    esc = False
+    obj_start = None
+    for i, ch in enumerate(body):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                obj_start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and obj_start is not None:
+                frag = body[obj_start:i + 1]
+                try:
+                    objs.append(json.loads(frag))
+                except Exception:
+                    pass  # pojedynczy zepsuty obiekt - pomijamy, reszta zostaje
+                obj_start = None
+    return objs
+
+
 def extract_json_array(text):
     text = text.strip()
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE | re.MULTILINE)
     start = text.find("[")
     end = text.rfind("]")
-    if start == -1 or end == -1 or end <= start:
+    if start == -1:
         raise ValueError("brak tablicy JSON w odpowiedzi")
-    return json.loads(text[start:end + 1])
+    # happy-path: pelna, poprawna tablica
+    if end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except Exception:
+            pass  # przejdz do tolerancyjnego odzysku ponizej
+    # fallback: ratuj poprawne obiekty (np. odpowiedz ucieta na max_tokens lub 1 zly obiekt)
+    body = text[start + 1: end if end > start else len(text)]
+    objs = _salvage_objects(body)
+    if not objs:
+        raise ValueError("brak tablicy JSON w odpowiedzi")
+    return objs
 
 
 # ---------- wywolanie API ----------
