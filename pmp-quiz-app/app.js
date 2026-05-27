@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-f56666c9';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-0c05e9b8';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -202,6 +202,21 @@ const I18N = {
   quick_quiz_sub:     { pl: 'Trening celowany lub losowy',       en: 'Targeted or random training' },
   statistics:         { pl: 'Statystyki',                       en: 'Statistics' },
   your_progress:      { pl: 'Twój postęp',                      en: 'Your progress' },
+  welcome_back:       { pl: 'Cześć, {nick}',                    en: 'Hello, {nick}' },
+  learner:            { pl: 'Uczniu',                           en: 'Learner' },
+  readiness_title:    { pl: 'Gotowość do egzaminu',             en: 'Exam readiness' },
+  readiness_disclaimer:{ pl: 'Wskaźnik treningowy PM Academy, nie oficjalny wynik egzaminu PMI.', en: 'PM Academy training indicator, not an official PMI exam result.' },
+  calibrating:        { pl: 'Kalibrujemy Twoją gotowość',       en: 'Calibrating your readiness' },
+  calibrating_more:   { pl: 'Odpowiedz na jeszcze {n} pytań z klasyfikacją ECO.', en: 'Answer {n} more ECO-classified questions.' },
+  weakest_area:       { pl: 'Najsłabszy obszar',                en: 'Weakest area' },
+  today_plan:         { pl: 'Plan na dziś',                     en: 'Today plan' },
+  plan_daily:         { pl: 'Ukończ codzienny zestaw i utrzymaj rytm nauki.', en: 'Complete today\'s set and keep your study rhythm.' },
+  plan_adaptive:      { pl: 'Wzmocnij obszar wymagający najwięcej pracy.', en: 'Strengthen the area needing the most work.' },
+  adaptive_training:  { pl: 'Trening adaptacyjny',              en: 'Adaptive training' },
+  streak_metric:      { pl: 'Seria',                            en: 'Streak' },
+  latest_result:      { pl: 'Ostatni wynik',                    en: 'Latest score' },
+  no_result:          { pl: 'Brak danych',                      en: 'No data' },
+  progress_title:     { pl: 'Postęp',                           en: 'Progress' },
   // settings modal
   settings_learning:  { pl: 'Nauka',                            en: 'Learning' },
   settings_display:   { pl: 'Wygląd i język',                   en: 'Appearance and language' },
@@ -255,6 +270,11 @@ const I18N = {
   conf_knew:          { pl: '✅ Wiedziałem/am!',                en: '✅ I knew it!' },
   verdict_correct:    { pl: '✅ Poprawnie!',                    en: '✅ Correct!' },
   verdict_wrong:      { pl: '❌ Błędna odpowiedź',              en: '❌ Wrong answer' },
+  why_answer:         { pl: 'Dlaczego ta odpowiedź?',           en: 'Why this answer?' },
+  session_daily:      { pl: 'Codzienne wyzwanie',               en: 'Daily challenge' },
+  session_adaptive:   { pl: 'Trening adaptacyjny',              en: 'Adaptive training' },
+  session_weak:       { pl: 'Powtórka słabych pytań',           en: 'Weak question review' },
+  session_quick:      { pl: 'Trening',                          en: 'Training' },
   next:               { pl: 'Dalej →',                          en: 'Next →' },
   // report modal
   report_aria:        { pl: 'Zgłoś błąd',                       en: 'Report an issue' },
@@ -280,6 +300,7 @@ const I18N = {
   most_difficulty:    { pl: 'Najwięcej trudności:',             en: 'Most difficulty:' },
   train_area:         { pl: 'Ćwicz ten obszar',                 en: 'Train this area' },
   play_again:         { pl: 'Zagraj ponownie',                  en: 'Play again' },
+  readiness_delta:    { pl: 'Zmiana gotowości: {n} pkt',        en: 'Readiness change: {n} pts' },
   // stats
   avg_correct:        { pl: 'Średnia poprawnych odpowiedzi',    en: 'Average correct answers' },
   d3:                 { pl: '3 dni',                            en: '3 days' },
@@ -1190,6 +1211,40 @@ const StatsManager = {
       return { key, correct, total, percent: total ? Math.round((correct / total) * 100) : null };
     });
   },
+  getRecentClassifiedHistory(days = 30, maxAnswers = 100) {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+    let answered = 0;
+    return Storage.getHistory().slice().reverse().filter(result => {
+      if (answered >= maxAnswers || new Date(result.date) < cutoff || !(result.breakdowns?.ecoDomain || []).length) return false;
+      answered += result.total || 0;
+      return true;
+    });
+  },
+  aggregateBreakdown(results, dimension) {
+    const totals = {};
+    results.flatMap(result => result.breakdowns?.[dimension] || []).forEach(item => {
+      if (!totals[item.key]) totals[item.key] = { correct: 0, total: 0 };
+      totals[item.key].correct += item.correct || 0;
+      totals[item.key].total += item.total || 0;
+    });
+    return Object.entries(totals).map(([key, item]) => ({
+      key, ...item, percent: Math.round(item.correct / item.total * 100),
+    }));
+  },
+  getReadiness() {
+    const recent = this.getRecentClassifiedHistory();
+    const answered = recent.reduce((sum, result) => sum + (result.total || 0), 0);
+    if (answered < 30) return { state: 'calibrating', answered, required: 30 };
+    const correct = recent.reduce((sum, result) => sum + (result.correct || 0), 0);
+    const accuracy = Math.round(correct / answered * 100);
+    const eco = this.aggregateBreakdown(recent, 'ecoDomain').filter(item => item.total >= 5);
+    const coverage = eco.length
+      ? Math.round(eco.reduce((sum, item) => sum + item.percent, 0) / eco.length)
+      : accuracy;
+    const score = Math.round(accuracy * 0.65 + coverage * 0.35);
+    const weakest = eco.slice().sort((a, b) => a.percent - b.percent)[0] || null;
+    return { state: 'ready', score, accuracy, coverage, weakest, answered };
+  },
   getRecommendation(questions) {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
     let answerCount = 0;
@@ -1772,7 +1827,10 @@ Views.home = {
     const streak     = StreakManager.getCurrentStreak();
     const dailyDone  = StreakManager.isDailyDoneToday();
     const weekDays   = StreakManager.getWeekDays();
+    const readiness  = StatsManager.getReadiness();
     const recommended = StatsManager.getRecommendation(AppState.questions);
+    const latestResult = Storage.getHistory().slice(-1)[0];
+    const nick = AppState.nick || t('learner');
 
     const streakLabel = streak === 0 ? t('streak_start')
       : streak === 1 ? t('streak_one')
@@ -1798,32 +1856,58 @@ Views.home = {
     }).join('');
 
     const syncLabel = { idle: '', syncing: '⟳ sync…', ok: '', error: '⚠ offline' }[AppState.syncStatus] || '';
+    const remaining = readiness.state === 'calibrating' ? Math.max(0, readiness.required - readiness.answered) : 0;
+    const planIsDaily = !dailyDone;
+    const planIsAdaptive = dailyDone && !!recommended;
+    const planLabel = planIsDaily ? t('daily_challenge') : planIsAdaptive ? t('adaptive_training') : t('quick_quiz');
+    const planText = planIsDaily ? t('plan_daily') : planIsAdaptive ? t('plan_adaptive') : t('quick_quiz_sub');
+    const planClick = planIsDaily
+      ? "App.navigate('daily-start')"
+      : planIsAdaptive
+        ? `Views['mode-select']._applyTraining('${recommended.dimension}', '${recommended.key}')`
+        : "App.navigate('mode-select')";
 
     return `
       <div class="screen home">
         <div class="home-topbar">
+          <div class="home-identity">
+            <span>${BRAND_NAME}</span>
+            <strong>${t('welcome_back', { nick })}</strong>
+          </div>
           <button class="btn-settings" onclick="Views.home._openSettings()" title="${t('settings')}" aria-label="${t('settings')}">${Icons.settings()}</button>
         </div>
         ${syncLabel ? `<div class="sync-indicator sync-indicator--${AppState.syncStatus}">${syncLabel}</div>` : ''}
         <div id="pwa-install-banner"></div>
-        <div class="streak-widget">
-          <div class="streak-count">
-            <span class="streak-count__num">${streak}</span>
-            <span class="streak-count__unit">${streakUnit}</span>
+        <section class="readiness-card">
+          <div>
+            <p class="card-eyebrow">${t('readiness_title')}</p>
+            ${readiness.state === 'ready'
+              ? `<div class="readiness-score">${readiness.score}<span>%</span></div>
+                 ${readiness.weakest ? `<p class="readiness-weak">${t('weakest_area')}: <strong>${tEcoDomain(readiness.weakest.key)}</strong></p>` : ''}`
+              : `<h2>${t('calibrating')}</h2><p class="readiness-calibrating">${t('calibrating_more', { n: remaining })}</p>`}
           </div>
-          <div class="streak-week">${dayCells}</div>
-          <hr class="streak-divider">
-          <div class="streak-message">${streakLabel}</div>
-          <button class="menu-btn menu-btn--daily ${dailyDone ? 'done' : 'pending'}"
-                  ${dailyDone ? 'disabled aria-disabled="true"' : `onclick="App.navigate('daily-start')"`}>
-            <span class="menu-btn__icon">${Icons.status(dailyDone)}</span>
-            <div class="menu-btn__content">
-              <div class="menu-btn__title">${t('daily_challenge')}</div>
-              <div class="menu-btn__sub">${dailyDone ? t('daily_done') : t('daily_pending')}</div>
-            </div>
-            ${dailyDone ? '' : '<span class="menu-btn__arrow">›</span>'}
-          </button>
+          ${readiness.state === 'ready' ? `<div class="readiness-ring" style="--score:${readiness.score}">${readiness.score}%</div>` : ''}
+          <p class="readiness-disclaimer">${t('readiness_disclaimer')}</p>
+        </section>
+        <section class="today-plan-card">
+          <p class="card-eyebrow">${t('today_plan')}</p>
+          <h2>${planLabel}</h2>
+          <p>${planText}</p>
+          <button class="btn-primary" onclick="${planClick}">${planLabel}</button>
+        </section>
+        <div class="metric-grid">
+          <section class="metric-card">
+            <p>${t('streak_metric')}</p>
+            <strong>${streak} ${streakUnit}</strong>
+            <small>${streakLabel}</small>
+          </section>
+          <section class="metric-card">
+            <p>${t('latest_result')}</p>
+            <strong>${latestResult ? `${latestResult.percent}%` : '—'}</strong>
+            <small>${latestResult ? latestResult.date : t('no_result')}</small>
+          </section>
         </div>
+        <div class="streak-widget streak-widget--compact"><div class="streak-week">${dayCells}</div></div>
         <div class="menu">
           ${recommended ? `
           <div class="recommended-training">
@@ -1851,7 +1935,7 @@ Views.home = {
           <button class="menu-btn" onclick="App.navigate('stats')">
             <span class="menu-btn__icon">${Icons.stats()}</span>
             <div class="menu-btn__content">
-              <div class="menu-btn__title">${t('statistics')}</div>
+              <div class="menu-btn__title">${t('progress_title')}</div>
               <div class="menu-btn__sub">${t('your_progress')}</div>
             </div>
             <span class="menu-btn__arrow">›</span>
@@ -2149,7 +2233,7 @@ Views['mode-select'] = {
       alert(t('no_questions_filter'));
       return;
     }
-    AppState.quizSession = { questions, current: 0, answers: [], mode: this._selectedMode, filters: this._filters, shuffledMap: {}, recentlyShown: [], currentAnswer: null };
+    AppState.quizSession = { questions, current: 0, answers: [], mode: this._selectedMode, filters: this._filters, shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
     App.navigate('quiz');
   },
 
@@ -2172,7 +2256,7 @@ Views['daily-start'] = {
       return;
     }
     const questions = QuizEngine.selectQuestions(AppState.questions, 'daily');
-    AppState.quizSession = { questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [], currentAnswer: null };
+    AppState.quizSession = { questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
     App.navigate('quiz');
   },
 };
@@ -2633,6 +2717,10 @@ Views.quiz = {
     const total = session.questions.length;
     const pct   = Math.round((session.current / total) * 100);
     const letters = ['A', 'B', 'C', 'D'];
+    const targeted = session.filters && Object.values(session.filters).some(values => values.length);
+    const sessionLabel = session.mode === 'daily' ? t('session_daily')
+      : session.mode === 'weak' ? t('session_weak')
+      : targeted ? t('session_adaptive') : t('session_quick');
 
     const answerBtns = displayAnswers.map((text, i) => `
       <button class="answer-btn" data-index="${i}"
@@ -2664,6 +2752,7 @@ Views.quiz = {
         <div class="quiz-progress">
           <div class="quiz-progress__bar" style="width:${pct}%"></div>
         </div>
+        <div class="quiz-context">${sessionLabel}</div>
         <div class="quiz-tags">${quizTagsHtml(q)}</div>
         <div class="quiz-question">${questionText}</div>
         <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
@@ -2817,11 +2906,12 @@ Views.quiz = {
       </button>` : '';
 
     panel.innerHTML = `
-      <div class="explanation-panel ${isCorrect ? 'explanation-panel--correct' : 'explanation-panel--wrong'}">
+      <div class="feedback-card ${isCorrect ? 'feedback-card--correct' : 'feedback-card--wrong'}">
         <div class="explanation-header">
           <span class="explanation-verdict">${isCorrect ? t('verdict_correct') : t('verdict_wrong')}</span>
           ${explanationLangBtn}
         </div>
+        <h3>${t('why_answer')}</h3>
         <div class="quiz-tags quiz-tags--feedback">${quizTagsHtml(q, true)}</div>
         <p class="explanation-text" id="expl-text">${explanationText}</p>
       </div>
@@ -2901,6 +2991,10 @@ Views.quiz = {
 
     const result = { date: TODAY(), mode: session.mode, correct, total, percent, domainResults, breakdowns };
     Storage.saveResult(result);
+    const readinessAfter = StatsManager.getReadiness();
+    const readinessDelta = session.readinessBefore?.state === 'ready' && readinessAfter.state === 'ready'
+      ? readinessAfter.score - session.readinessBefore.score
+      : null;
 
     let streakExtended = false;
     if (session.mode === 'daily') {
@@ -2914,7 +3008,7 @@ Views.quiz = {
     SupabaseSync.saveQuizSession({ mode: session.mode, correct, total, percent, domainResults, breakdowns }).catch(console.error);
     SupabaseSync.pushProgress().catch(console.error);
 
-    AppState.lastSummary = { correct, total, percent, bestStreak, weakestDomain, weakestSegment, streakExtended, mode: session.mode };
+    AppState.lastSummary = { correct, total, percent, bestStreak, weakestDomain, weakestSegment, streakExtended, mode: session.mode, readinessAfter, readinessDelta };
     AppState.quizSession = null;
     App.navigate('summary');
   },
@@ -3023,10 +3117,10 @@ Views.summary = {
     const s = AppState.lastSummary;
     if (!s) { App.navigate('home'); return ''; }
     const barColor = s.percent >= 80 ? 'var(--green)' : s.percent >= 60 ? 'var(--yellow)' : 'var(--red)';
-    const emoji    = s.percent >= 80 ? '🎉' : s.percent >= 60 ? '👍' : '💪';
+    const readinessLabel = s.readinessAfter?.state === 'ready' ? `${s.readinessAfter.score}%` : t('calibrating');
     return `
       <div class="screen summary">
-        <div class="summary__title">${emoji} ${t('quiz_complete')}</div>
+        <div class="summary__title">${t('quiz_complete')}</div>
         ${s.streakExtended ? `<div class="summary__streak-msg">${t('streak_extended')}</div>` : ''}
         <div class="summary__score-circle">
           <div class="summary__score-num">${s.correct}/${s.total}</div>
@@ -3036,6 +3130,12 @@ Views.summary = {
           <div class="summary__progress-bar"
                style="width:0%;background:${barColor}"
                data-target="${s.percent}"></div>
+        </div>
+        <div class="summary-readiness">
+          <span>${t('readiness_title')}</span>
+          <strong>${readinessLabel}</strong>
+          ${s.readinessDelta !== null ? `<small>${t('readiness_delta', { n: s.readinessDelta > 0 ? '+' + s.readinessDelta : s.readinessDelta })}</small>` : ''}
+          <p>${t('readiness_disclaimer')}</p>
         </div>
         <div class="summary__details">
           <div class="summary__detail">
@@ -3056,7 +3156,7 @@ Views.summary = {
         </div>
         <div class="summary__actions">
           <button class="btn-secondary" onclick="App.navigate('home')">${t('back_to_menu')}</button>
-          <button class="btn-primary" style="flex:1"
+          <button class="${s.weakestSegment ? 'btn-secondary' : 'btn-primary'}" style="flex:1"
                   onclick="Views.summary._replay()">${t('play_again')}</button>
         </div>
       </div>`;
@@ -3089,6 +3189,7 @@ Views.stats = {
   _activeBreakdown: 'ecoDomain',
 
   render() {
+    const readiness = StatsManager.getReadiness();
     const avg3  = StatsManager.getAvg(3);
     const avg7  = StatsManager.getAvg(7);
     const avg30 = StatsManager.getAvg(30);
@@ -3131,7 +3232,16 @@ Views.stats = {
 
     return `
       <div class="screen stats">
-        <h1>${t('statistics')}</h1>
+        <h1>${t('progress_title')}</h1>
+
+        <div class="stats-card stats-readiness">
+          <h3>${t('readiness_title')}</h3>
+          ${readiness.state === 'ready'
+            ? `<div class="stats-readiness__score">${readiness.score}%</div>
+               ${readiness.weakest ? `<p>${t('weakest_area')}: <strong>${tEcoDomain(readiness.weakest.key)}</strong></p>` : ''}`
+            : `<p>${t('calibrating_more', { n: Math.max(0, readiness.required - readiness.answered) })}</p>`}
+          <p class="readiness-disclaimer">${t('readiness_disclaimer')}</p>
+        </div>
 
         <div class="stats-card">
           <h3>${t('avg_correct')}</h3>

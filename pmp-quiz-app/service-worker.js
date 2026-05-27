@@ -3,7 +3,7 @@
 // UWAGA: APP_VERSION jest generowany automatycznie przez tools/build.py
 // (hash ze wszystkich cache'owanych assetów). NIE modyfikuj tej linii ręcznie —
 // uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-f56666c9';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-0c05e9b8';  // placeholder, nadpisywany przez build.py
 const CACHE_NAME  = `pmp-quiz-${APP_VERSION}`;
 
 const ASSETS = [

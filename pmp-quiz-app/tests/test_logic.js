@@ -309,6 +309,40 @@ const StatsManager = {
       return { domain, percent: Math.round(correct / total * 100), total };
     });
   },
+  getRecentClassifiedHistory(days = 30, maxAnswers = 100) {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+    let answered = 0;
+    return Storage.getHistory().slice().reverse().filter(result => {
+      if (answered >= maxAnswers || new Date(result.date) < cutoff || !(result.breakdowns?.ecoDomain || []).length) return false;
+      answered += result.total || 0;
+      return true;
+    });
+  },
+  aggregateBreakdown(results, dimension) {
+    const totals = {};
+    results.flatMap(result => result.breakdowns?.[dimension] || []).forEach(item => {
+      if (!totals[item.key]) totals[item.key] = { correct: 0, total: 0 };
+      totals[item.key].correct += item.correct || 0;
+      totals[item.key].total += item.total || 0;
+    });
+    return Object.entries(totals).map(([key, item]) => ({
+      key, ...item, percent: Math.round(item.correct / item.total * 100),
+    }));
+  },
+  getReadiness() {
+    const recent = this.getRecentClassifiedHistory();
+    const answered = recent.reduce((sum, result) => sum + (result.total || 0), 0);
+    if (answered < 30) return { state: 'calibrating', answered, required: 30 };
+    const correct = recent.reduce((sum, result) => sum + (result.correct || 0), 0);
+    const accuracy = Math.round(correct / answered * 100);
+    const eco = this.aggregateBreakdown(recent, 'ecoDomain').filter(item => item.total >= 5);
+    const coverage = eco.length
+      ? Math.round(eco.reduce((sum, item) => sum + item.percent, 0) / eco.length)
+      : accuracy;
+    const score = Math.round(accuracy * 0.65 + coverage * 0.35);
+    const weakest = eco.slice().sort((a, b) => a.percent - b.percent)[0] || null;
+    return { state: 'ready', score, accuracy, coverage, weakest, answered };
+  },
   getRecommendation(questions) {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
     let answerCount = 0;
@@ -620,6 +654,38 @@ test('recommendation ignores a segment with fewer than five answers', () => {
     approach: [{ key: 'agile', correct: 0, total: 4, percent: 0 }],
   } });
   assertEqual(StatsManager.getRecommendation(pool).key, 'Process');
+});
+function classifiedResult(correct, total, ecoCounts) {
+  return {
+    date: TODAY(), mode: 'quick', correct, total,
+    percent: Math.round(correct / total * 100),
+    breakdowns: {
+      ecoDomain: Object.entries(ecoCounts).map(([key, count]) => ({
+        key, ...count, percent: Math.round(count.correct / count.total * 100),
+      })),
+    },
+  };
+}
+test('readiness remains calibrating below 30 classified answers', () => {
+  reset();
+  Storage.saveResult(classifiedResult(18, 20, { Process: { correct: 18, total: 20 } }));
+  assertEqual(StatsManager.getReadiness().state, 'calibrating');
+});
+test('readiness ignores legacy results without ECO breakdown entries', () => {
+  reset();
+  Storage.saveResult({ date: TODAY(), mode: 'quick', correct: 27, total: 30, percent: 90, breakdowns: {} });
+  assertEqual(StatsManager.getReadiness().state, 'calibrating');
+});
+test('readiness identifies the weakest ECO segment after calibration', () => {
+  reset();
+  Storage.saveResult(classifiedResult(21, 30, {
+    People: { correct: 8, total: 10 },
+    Process: { correct: 6, total: 10 },
+    'Business Environment': { correct: 7, total: 10 },
+  }));
+  const readiness = StatsManager.getReadiness();
+  assertEqual(readiness.state, 'ready');
+  assertEqual(readiness.weakest.key, 'Process');
 });
 
 // ===== TRIAL EXAM TESTS (plan 12, sekcja 19a) =====
