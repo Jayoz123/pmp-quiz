@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-7a3cd66b';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-1f034396';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -102,6 +102,27 @@ const I18N = {
   code_required:      { pl: 'Podaj kod beta w formacie PMP-XXXX-XXXX.', en: 'Enter a beta code in the format PMP-XXXX-XXXX.' },
   register_verifying: { pl: 'Weryfikuję kod i rejestruję…',     en: 'Verifying code and registering…' },
   register_ok:        { pl: '✅ Konto utworzone! Możesz się teraz zalogować.', en: '✅ Account created! You can sign in now.' },
+  // Google OAuth + beta code
+  oauth_or:           { pl: 'lub',                              en: 'or' },
+  oauth_code_ph:      { pl: 'Kod beta (do logowania Google)',   en: 'Beta code (for Google sign-in)' },
+  oauth_code_hint:    { pl: 'Wymagany przy pierwszym logowaniu przez Google.', en: 'Required the first time you sign in with Google.' },
+  oauth_google_btn:   { pl: 'Zaloguj przez Google',             en: 'Sign in with Google' },
+  oauth_need_code:    { pl: 'Aby zalogować się przez Google, najpierw podaj kod beta.', en: 'To sign in with Google, enter your beta code first.' },
+  oauth_redirecting:  { pl: 'Przekierowuję do Google…',         en: 'Redirecting to Google…' },
+  // password reset (email + original beta code + new password ×2)
+  forgot_pass_link:   { pl: 'Nie pamiętasz hasła?',             en: 'Forgot your password?' },
+  reset_subtitle:     { pl: 'Reset hasła — podaj email i swój kod beta', en: 'Password reset — enter your email and beta code' },
+  reset_email_ph:     { pl: 'Adres email konta',               en: 'Account email address' },
+  reset_code_ph:      { pl: 'Kod beta użyty przy rejestracji',  en: 'Beta code used at registration' },
+  reset_pass_ph:      { pl: 'Nowe hasło (min. 6 znaków)',       en: 'New password (min. 6 characters)' },
+  reset_pass2_ph:     { pl: 'Powtórz nowe hasło',               en: 'Repeat new password' },
+  reset_submit:       { pl: 'Ustaw nowe hasło',                 en: 'Set new password' },
+  reset_back_login:   { pl: '← Wróć do logowania',              en: '← Back to sign in' },
+  reset_pass_mismatch:{ pl: 'Hasła nie są identyczne.',         en: 'Passwords do not match.' },
+  reset_pass_short:   { pl: 'Hasło musi mieć co najmniej 6 znaków.', en: 'Password must be at least 6 characters.' },
+  reset_email_required:{ pl: 'Podaj prawidłowy adres email.',   en: 'Enter a valid email address.' },
+  reset_verifying:    { pl: 'Zmieniam hasło…',                  en: 'Updating password…' },
+  reset_ok:           { pl: '✅ Hasło zmienione. Zaloguj się nowym hasłem.', en: '✅ Password changed. Sign in with your new password.' },
   // home
   settings:           { pl: 'Ustawienia',                       en: 'Settings' },
   streak_start:       { pl: '⚡ Zacznij serię!',                en: '⚡ Start a streak!' },
@@ -600,6 +621,64 @@ const Auth = {
     catch { throw new Error(t('generic_error')); }
     return data;
   },
+  // Start the Google OAuth redirect. The beta code is NOT sent here — it's
+  // stashed in sessionStorage by Views.login._google() before this runs, and
+  // claimed server-side after the redirect lands back in App.init() (the gate).
+  // redirectTo brings the user back to this exact page; detectSessionInUrl
+  // (on by default) then picks the token out of the URL and sets the session.
+  async signInWithGoogle() {
+    const { error } = await sb().auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname,
+      },
+    });
+    if (error) throw error;
+    // The browser is now redirecting to Google; the code is already stored.
+  },
+
+  // First Google login only: hand the pending beta code to claim-oauth-beta,
+  // authenticated with the user's own access token. Creates the tester profile.
+  // Returns { ok } on success or { error } with a user-facing message.
+  async claimOauthBeta(code) {
+    const { data: { session } } = await sb().auth.getSession();
+    const token = session?.access_token;
+    if (!token) return { error: t('generic_error') };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/claim-oauth-beta`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${token}`,   // the USER's token, not the anon key
+        'apikey':        SUPABASE_ANON,
+      },
+      body: JSON.stringify({ code }),
+    });
+    let data;
+    try { data = await res.json(); }
+    catch { return { error: t('generic_error') }; }
+    return data;
+  },
+
+  // Password reset without Supabase email auth: email + the ORIGINAL beta code
+  // + a new password go to the reset-beta-password Edge Function, which verifies
+  // the (email, code) pair against user_profiles and sets the password via the
+  // admin API. Returns { ok } or { error }.
+  async resetPassword(email, code, newPassword) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/reset-beta-password`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'apikey':        SUPABASE_ANON,
+      },
+      body: JSON.stringify({ email, code, newPassword }),
+    });
+    let data;
+    try { data = await res.json(); }
+    catch { throw new Error(t('generic_error')); }
+    return data; // { ok } or { error }
+  },
+
   async signOut() {
     await sb().auth.signOut();
   },
@@ -1112,6 +1191,14 @@ const App = {
       this.navigate('login');
       return;
     }
+    // Beta gate for Google OAuth: a fresh Google sign-in lands here with a valid
+    // session but possibly NO tester profile yet (Supabase creates auth.users for
+    // any Google account even with sign-ups OFF). _oauthGate ensures such a user
+    // has claimed a beta code; if it can't be satisfied it signs out and bounces
+    // to login itself, returning false so we stop here. Existing testers (profile
+    // present, or email/password logins) pass straight through.
+    const gated = await this._oauthGate();
+    if (!gated) return;
     // Multi-device guard: if another device has claimed this account since we
     // last opened the app, sign out here and bounce to login with a notice.
     const isValid = await SessionGuard.verify();
@@ -1122,6 +1209,62 @@ const App = {
       return;
     }
     await this.afterAuth();
+  },
+
+  // Returns true to continue normal startup, false if it has already redirected
+  // (signed the user out and navigated to login). Key for Google OAuth:
+  //   - profile exists           → existing tester → continue
+  //   - no profile + pending code → first Google login → claim it → continue
+  //   - no profile + no code      → someone reached a session without a code →
+  //                                 sign out, send back to login with a notice
+  //   - no profile + bad/used code→ claim rejected → sign out, show the reason
+  // The pending code is stashed in sessionStorage by Views.login._google()
+  // before the redirect to Google, and survives the round-trip.
+  async _oauthGate() {
+    try {
+      const { data: { user } } = await sb().auth.getUser();
+      if (!user) return true; // no user → let the normal (no-session) path handle it
+
+      // RLS allows a user to read only their own profile row.
+      const { data: profile, error } = await sb()
+        .from('user_profiles')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      // Profile present → existing tester (email or already-claimed Google).
+      // On a query error, fail OPEN (don't lock out a legitimate tester over a
+      // transient Supabase hiccup) — same philosophy as SessionGuard.verify.
+      if (error) return true;
+      if (profile) {
+        sessionStorage.removeItem('pmp_pending_beta_code');
+        return true;
+      }
+
+      // No profile → this is a first Google login that must present a code.
+      const pendingCode = sessionStorage.getItem('pmp_pending_beta_code');
+      if (!pendingCode) {
+        await Auth.signOut();
+        this.navigate('login', { sessionKickedMsg: t('oauth_need_code') });
+        return false;
+      }
+
+      const data = await Auth.claimOauthBeta(pendingCode);
+      if (!data || !data.ok) {
+        sessionStorage.removeItem('pmp_pending_beta_code');
+        await Auth.signOut();
+        this.navigate('login', { sessionKickedMsg: (data && data.error) || t('generic_error') });
+        return false;
+      }
+
+      // Claim succeeded → profile now exists; clear the code and continue.
+      sessionStorage.removeItem('pmp_pending_beta_code');
+      return true;
+    } catch (e) {
+      console.warn('OAuth gate failed:', e);
+      // Fail open: don't strand a tester if the gate itself errors.
+      return true;
+    }
   },
 
   async afterAuth() {
@@ -1167,17 +1310,55 @@ const App = {
 
 // ==================== LOGIN VIEW ====================
 Views.login = {
+  // 'login' | 'register' | 'reset'
   _mode: 'login',
 
   render() {
-    const isReg = this._mode === 'register';
+    const isReg   = this._mode === 'register';
+    const isReset = this._mode === 'reset';
+    const subtitle = isReset ? t('reset_subtitle')
+                   : isReg   ? t('login_subtitle_beta')
+                   :           t('login_subtitle');
     const kickedBanner = AppState.sessionKickedMsg ? `
         <div class="login-kicked-banner">⚠️ ${AppState.sessionKickedMsg}</div>` : '';
+
+    // ── Password-reset form (email + original beta code + new password ×2) ──
+    if (isReset) {
+      return `
+      <div class="screen login-screen">
+        <div class="login-logo">📋</div>
+        <h1 class="login-title">PMP Quiz</h1>
+        <p class="login-subtitle">${subtitle}</p>
+        ${kickedBanner}
+        <div class="login-form">
+          <input type="email" id="r-email" placeholder="${t('reset_email_ph')}"
+                 autocomplete="email" inputmode="email" spellcheck="false"
+                 autocapitalize="none" />
+          <input type="text" id="r-code" placeholder="${t('reset_code_ph')}"
+                 autocomplete="off" maxlength="13" spellcheck="false"
+                 inputmode="text"
+                 oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')" />
+          <input type="password" id="r-pass" placeholder="${t('reset_pass_ph')}"
+                 autocomplete="new-password" />
+          <input type="password" id="r-pass2" placeholder="${t('reset_pass2_ph')}"
+                 autocomplete="new-password" />
+          <div id="l-msg" class="login-msg hidden"></div>
+          <button class="btn-primary" id="l-submit" onclick="Views.login._submit()">
+            ${t('reset_submit')}
+          </button>
+          <button class="btn-link" onclick="Views.login._setMode('login')">
+            ${t('reset_back_login')}
+          </button>
+        </div>
+      </div>`;
+    }
+
+    // ── Login / Register form ──
     return `
       <div class="screen login-screen">
         <div class="login-logo">📋</div>
         <h1 class="login-title">PMP Quiz</h1>
-        <p class="login-subtitle">${isReg ? t('login_subtitle_beta') : t('login_subtitle')}</p>
+        <p class="login-subtitle">${subtitle}</p>
         ${kickedBanner}
         <div class="login-form">
           ${isReg ? `
@@ -1205,22 +1386,93 @@ Views.login = {
           <button class="btn-primary" id="l-submit" onclick="Views.login._submit()">
             ${isReg ? t('sign_up_beta') : t('sign_in')}
           </button>
-          <button class="btn-link" onclick="Views.login._toggle()">
+          ${!isReg ? `
+          <button class="btn-link" onclick="Views.login._setMode('reset')">
+            ${t('forgot_pass_link')}
+          </button>
+
+          <div class="login-divider"><span>${t('oauth_or')}</span></div>
+
+          <input type="text" id="l-code-oauth" placeholder="${t('oauth_code_ph')}"
+                 autocomplete="off" maxlength="13" spellcheck="false"
+                 inputmode="text"
+                 oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')" />
+          <p class="login-beta-hint">${t('oauth_code_hint')}</p>
+          <button class="btn-google" id="l-google" onclick="Views.login._google()">
+            <span class="btn-google__icon">G</span> ${t('oauth_google_btn')}
+          </button>` : ''}
+
+          <button class="btn-link" onclick="Views.login._setMode('${isReg ? 'login' : 'register'}')">
             ${isReg ? t('have_account') : t('no_account')}
           </button>
         </div>
       </div>`;
   },
 
-  _toggle() {
-    this._mode = this._mode === 'login' ? 'register' : 'login';
+  _setMode(mode) {
+    this._mode = mode;
     App.render();
   },
 
+  // Start the Google OAuth flow. The beta code MUST be present first: we stash
+  // it in sessionStorage so it survives the redirect to Google and back, then
+  // App._oauthGate() claims it server-side once the session lands.
+  async _google() {
+    const code = document.getElementById('l-code-oauth')?.value.trim().toUpperCase();
+    if (!code || code.length < 12) {
+      this._msg(t('oauth_need_code'), false);
+      return;
+    }
+    sessionStorage.setItem('pmp_pending_beta_code', code);
+    const btn = document.getElementById('l-google');
+    if (btn) btn.disabled = true;
+    this._msg(t('oauth_redirecting'), true);
+    try {
+      await Auth.signInWithGoogle();   // browser redirects away on success
+    } catch (e) {
+      sessionStorage.removeItem('pmp_pending_beta_code');
+      if (btn) btn.disabled = false;
+      this._msg(e.message || t('generic_error'), false);
+    }
+  },
+
   async _submit() {
+    const btn = document.getElementById('l-submit');
+
+    // ── reset ──
+    if (this._mode === 'reset') {
+      const email = document.getElementById('r-email')?.value.trim();
+      const code  = document.getElementById('r-code')?.value.trim().toUpperCase();
+      const pass  = document.getElementById('r-pass')?.value;
+      const pass2 = document.getElementById('r-pass2')?.value;
+
+      if (!email || !/^\S+@\S+\.\S+$/.test(email)) { this._msg(t('reset_email_required'), false); return; }
+      if (!code || code.length < 12) { this._msg(t('code_required'), false); return; }
+      if (!pass || pass.length < 6) { this._msg(t('reset_pass_short'), false); return; }
+      if (pass !== pass2) { this._msg(t('reset_pass_mismatch'), false); return; }
+
+      btn.disabled = true; btn.textContent = '…';
+      this._msg(t('reset_verifying'), true);
+      try {
+        const data = await Auth.resetPassword(email, code, pass);
+        if (!data || !data.ok) {
+          this._msg((data && data.error) || t('generic_error'), false);
+          btn.disabled = false; btn.textContent = t('reset_submit');
+          return;
+        }
+        // Success → bounce back to login and surface the confirmation there.
+        this._mode = 'login';
+        App.render();
+        this._msg(t('reset_ok'), true);
+      } catch (e) {
+        this._msg(e.message || t('generic_error'), false);
+        btn.disabled = false; btn.textContent = t('reset_submit');
+      }
+      return;
+    }
+
     const email = document.getElementById('l-email')?.value.trim();
     const pass  = document.getElementById('l-pass')?.value;
-    const btn   = document.getElementById('l-submit');
 
     if (!email || !pass) { this._msg(t('enter_credentials'), false); return; }
 

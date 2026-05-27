@@ -882,6 +882,64 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 }
 .btn-link:hover { text-decoration: underline; }
 
+/* "lub" divider between the email/password block and the Google button */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text2);
+  font-size: 0.82rem;
+  margin: 4px 0;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Google sign-in button — neutral surface with a border so it reads as a
+   secondary action next to the primary email/password sign-in. */
+.btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.btn-google:hover { border-color: var(--accent); }
+.btn-google:disabled { opacity: 0.6; cursor: default; }
+.btn-google__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  color: #4285f4;
+  font-weight: 800;
+  font-size: 0.95rem;
+  line-height: 1;
+  border: 1px solid var(--border);
+}
+/* The OAuth code field reads as an access code, like the registration one */
+#l-code-oauth {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
 /* ===== QUIZ REPORT BUTTON ===== */
 .quiz-report-btn {
   background: none;
