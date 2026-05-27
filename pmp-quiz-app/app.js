@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-1f034396';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-4267e665';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -18,6 +18,7 @@ const sb = () => {
 // ==================== CONSTANTS ====================
 const QUIZ_SIZES   = { daily: 30, quick: 10, weak: 10 };
 const SRS_COOLDOWN = 15; // min questions before re-showing the same weak question
+const GOOGLE_OAUTH_VISIBLE = false; // Keep the Google beta flow dormant until invites are managed automatically.
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
 // ==================== TRIAL EXAM (plan 12) ====================
@@ -1389,8 +1390,9 @@ Views.login = {
           ${!isReg ? `
           <button class="btn-link" onclick="Views.login._setMode('reset')">
             ${t('forgot_pass_link')}
-          </button>
+          </button>` : ''}
 
+          ${!isReg && GOOGLE_OAUTH_VISIBLE ? `
           <div class="login-divider"><span>${t('oauth_or')}</span></div>
 
           <input type="text" id="l-code-oauth" placeholder="${t('oauth_code_ph')}"
