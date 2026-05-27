@@ -7,9 +7,9 @@ Scala dwie finalne pule JSONL:
   - Agile : out/balanced_agile.jsonl (cel ~189)
 
 i produkuje pojedynczy plik tablicy JSON `questions_v2.json` w formacie aplikacji:
-  - renumeracja `id` od 1001 (najpierw cala pula PMBOK, potem Agile) - id ciagle i unikalne,
-  - zachowanie wszystkich pol rekordu (aplikacja ignoruje nieznane pola: eco_domain,
-    eco_task, difficulty, qtype, source_concept, generated_by, review_status...),
+  - zachowanie istniejacego `id` pytania po stabilnym kluczu tresci; nowe pytania
+    otrzymuja kolejne wolne id od 1001,
+  - zachowanie wszystkich pol rekordu oraz dodanie source_pool i approach_tags,
   - usuniecie pol czysto wewnetrznych pipeline'u (`_chunk_ids`) - nie sa potrzebne w aplikacji,
   - format zgodny z istniejacym questions.json: tablica obiektow, wciecie 2 spacje, UTF-8
     (ensure_ascii=False, polskie znaki zachowane).
@@ -52,6 +52,23 @@ DROP_FIELDS = ("_chunk_ids",)
 # Pola wymagane przez aplikacje (musza istniec i byc niepuste tam, gdzie to ma sens).
 APP_REQUIRED = ("domain", "question", "question_en", "answers", "answers_en",
                 "correct", "explanation", "explanation_en")
+VALID_ECO_DOMAINS = {"People", "Process", "Business Environment"}
+VALID_DIFFICULTIES = {"easy", "medium", "hard"}
+VALID_QTYPES = {"scenario", "knowledge", "calculation"}
+VALID_SOURCE_POOLS = {"pmbok", "agile"}
+VALID_APPROACH_TAGS = {"agile", "hybrid", "predictive"}
+AGILE_PMBOK_CONCEPTS = {
+    "agile-frameworks-scrum-kanban",
+    "agile-scheduling-story-points-velocity",
+    "managing-change-in-agile",
+    "mvp-and-incremental-value-delivery",
+    "product-backlog-and-refinement",
+}
+CROSS_APPROACH_CONCEPTS = {"predictive-adaptive-and-hybrid"}
+DOMAIN_NORMALIZATION = {
+    "Jakosc": "Jako\u015b\u0107",
+    "Srodowisko biznesowe": "\u015arodowisko biznesowe",
+}
 
 
 def load_jsonl(path: Path):
@@ -93,19 +110,76 @@ def validate_record(q, src, idx):
             errs.append(f"'{k}' puste/niepoprawne")
     if isinstance(a, list) and len(a) == 4 and len(set(a)) != 4:
         errs.append("zduplikowane odpowiedzi (PL)")
+    if q.get("eco_domain") not in VALID_ECO_DOMAINS:
+        errs.append(f"eco_domain nieznane: {q.get('eco_domain')!r}")
+    if q.get("difficulty") not in VALID_DIFFICULTIES:
+        errs.append(f"difficulty nieznane: {q.get('difficulty')!r}")
+    if q.get("qtype") not in VALID_QTYPES:
+        errs.append(f"qtype nieznane: {q.get('qtype')!r}")
     if errs:
         return [f"[{src} #{idx}] " + "; ".join(errs)]
     return []
 
 
-def to_app_record(q, new_id):
-    """Buduje rekord aplikacyjny: nowe id na poczatku, wszystkie pola poza DROP_FIELDS."""
-    rec = {"id": new_id}
+def stable_question_key(q):
+    """Klucz nie zmienia sie przy poprawie odpowiedzi lub aktualizacji metadanych."""
+    return q.get("question_en") or q.get("question") or ""
+
+
+def approach_tags(q, source_pool):
+    concept = q.get("source_concept")
+    if source_pool == "agile":
+        return ["agile"]
+    if concept in CROSS_APPROACH_CONCEPTS:
+        return ["agile", "hybrid", "predictive"]
+    if concept in AGILE_PMBOK_CONCEPTS:
+        return ["agile"]
+    return []
+
+
+def to_app_record(q, question_id, source_pool):
+    """Buduje rekord aplikacyjny z klasyfikacja widoczna dla runtime."""
+    rec = {"id": question_id}
     for k, v in q.items():
         if k in DROP_FIELDS or k == "id":
             continue
         rec[k] = v
+    rec["domain"] = DOMAIN_NORMALIZATION.get(rec["domain"], rec["domain"])
+    rec["source_pool"] = source_pool
+    rec["approach_tags"] = approach_tags(q, source_pool)
     return rec
+
+
+def validate_app_classification(q, src, idx):
+    errs = []
+    if q.get("source_pool") not in VALID_SOURCE_POOLS:
+        errs.append(f"source_pool nieznane: {q.get('source_pool')!r}")
+    tags = q.get("approach_tags")
+    if not isinstance(tags, list):
+        errs.append("approach_tags nie jest tablica")
+    elif any(tag not in VALID_APPROACH_TAGS for tag in tags):
+        errs.append(f"approach_tags nieznane: {tags!r}")
+    if errs:
+        return [f"[{src} #{idx}] " + "; ".join(errs)]
+    return []
+
+
+def load_existing_ids(path):
+    if not path.exists():
+        return {}, set()
+    try:
+        previous = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}, set()
+    ids_by_key = {}
+    used_ids = set()
+    for q in previous if isinstance(previous, list) else []:
+        question_id = q.get("id")
+        if not isinstance(question_id, int):
+            continue
+        used_ids.add(question_id)
+        ids_by_key.setdefault(stable_question_key(q), question_id)
+    return ids_by_key, used_ids
 
 
 def main():
@@ -165,26 +239,48 @@ def main():
             print(f"    ... (+{len(errors) - 30} wiecej)")
         raise SystemExit("[M4] PRZERWANO: napraw rekordy i powtorz.")
 
-    # --- scalenie + renumeracja ---
+    # --- scalenie + stabilne identyfikatory ---
+    out = Path(args.output)
+    existing_ids, retired_or_used_ids = load_existing_ids(out)
     merged = []
-    nid = args.start_id
+    assigned_ids = set()
+    next_id = max(retired_or_used_ids | {args.start_id - 1}) + 1
+
+    def next_question_id(q):
+        nonlocal next_id
+        existing_id = existing_ids.get(stable_question_key(q))
+        if existing_id is not None and existing_id not in assigned_ids:
+            assigned_ids.add(existing_id)
+            return existing_id
+        while next_id in retired_or_used_ids or next_id in assigned_ids:
+            next_id += 1
+        assigned_ids.add(next_id)
+        question_id = next_id
+        next_id += 1
+        return question_id
+
     for q in pmbok:
-        merged.append(to_app_record(q, nid)); nid += 1
+        merged.append(to_app_record(q, next_question_id(q), "pmbok"))
     for q in agile:
-        merged.append(to_app_record(q, nid)); nid += 1
+        merged.append(to_app_record(q, next_question_id(q), "agile"))
+
+    classification_errors = []
+    for i, q in enumerate(merged, 1):
+        classification_errors += validate_app_classification(q, "output", i)
+    if classification_errors:
+        raise SystemExit("[M4] PRZERWANO: " + "; ".join(classification_errors[:10]))
 
     ids = [r["id"] for r in merged]
     assert len(ids) == len(set(ids)), "duplikaty id (nie powinno wystapic)"
-    assert ids == list(range(args.start_id, args.start_id + len(merged))), "id nieciagle"
 
-    out = Path(args.output)
     tmp = out.with_suffix(out.suffix + ".tmp")
     tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, out)
 
     print(f"[M4] scalono: {len(merged)} pytan "
           f"(PMBOK {len(pmbok)} + Agile {len(agile)})")
-    print(f"[M4] id: {ids[0]}..{ids[-1]} (ciagle, unikalne)")
+    preserved = sum(1 for question_id in ids if question_id in retired_or_used_ids)
+    print(f"[M4] id: {min(ids)}..{max(ids)} (unikalne, zachowano {preserved})")
     print(f"[M4] -> {out}")
 
 

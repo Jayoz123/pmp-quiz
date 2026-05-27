@@ -39,6 +39,14 @@ const Storage = {
   },
 };
 
+const emptyFilters = () => ({ domains: [], ecoDomains: [], approachTags: [], difficulties: [], qtypes: [] });
+const filterForSegment = (dimension, key) => {
+  const filters = emptyFilters();
+  const filterKey = { domain: 'domains', ecoDomain: 'ecoDomains', approach: 'approachTags', difficulty: 'difficulties', qtype: 'qtypes' }[dimension];
+  if (filterKey) filters[filterKey] = [key];
+  return filters;
+};
+
 const QuizEngine = {
   shuffle(arr) {
     const a = [...arr];
@@ -48,11 +56,31 @@ const QuizEngine = {
     }
     return a;
   },
-  selectQuestions(allQuestions, mode, domains = []) {
+  normalizeFilters(filters) {
+    if (Array.isArray(filters)) return { ...emptyFilters(), domains: filters };
+    return { ...emptyFilters(), ...(filters || {}) };
+  },
+  matchesFilters(q, filters = {}) {
+    const f = this.normalizeFilters(filters);
+    const selectedIn = (values, value) => values.length === 0 || values.includes(value);
+    return selectedIn(f.domains, q.domain)
+      && selectedIn(f.ecoDomains, q.eco_domain)
+      && selectedIn(f.difficulties, q.difficulty)
+      && selectedIn(f.qtypes, q.qtype)
+      && (f.approachTags.length === 0 || (q.approach_tags || []).some(tag => f.approachTags.includes(tag)));
+  },
+  countAvailable(allQuestions, mode, filters = {}) {
+    const matching = allQuestions.filter(q => this.matchesFilters(q, filters));
+    if (mode !== 'weak') return matching.length;
+    const weak = Storage.getWeakQuestions();
+    return matching.filter(q => (weak[q.id] || 0) > 0).length;
+  },
+  selectQuestions(allQuestions, mode, filters = [], recentlyShown = [], requestedSize = null) {
+    const matching = allQuestions.filter(q => this.matchesFilters(q, filters));
     if (mode === 'weak') {
       const wq = Storage.getWeakQuestions();
       let pool = [];
-      allQuestions.forEach(q => {
+      matching.forEach(q => {
         const count = wq[q.id] || 0;
         if (count > 0) { const w = Math.min(count * 3, 9); for (let i = 0; i < w; i++) pool.push(q); }
       });
@@ -60,9 +88,8 @@ const QuizEngine = {
       const seen = new Set();
       return pool.filter(q => { if (seen.has(q.id)) return false; seen.add(q.id); return true; }).slice(0, 10);
     }
-    let pool = domains.length > 0 ? allQuestions.filter(q => domains.includes(q.domain)) : [...allQuestions];
-    const size = mode === 'daily' ? 30 : 10;
-    return this.shuffle(pool).slice(0, size);
+    const size = requestedSize || (mode === 'daily' ? 30 : 10);
+    return this.shuffle(matching).slice(0, size);
   },
   shuffleAnswers(q) {
     const indexed = q.answers.map((text, i) => ({ text, isCorrect: i === q.correct }));
@@ -84,6 +111,37 @@ const QuizEngine = {
       if (wq[id]) { wq[id] = Math.max(0, wq[id] - 1); if (wq[id] === 0) delete wq[id]; }
     }
     Storage.saveWeakQuestions(wq);
+  },
+  answerRecord(q, correct) {
+    return { questionId: q.id, correct, domain: q.domain, ecoDomain: q.eco_domain, ecoTask: q.eco_task,
+      difficulty: q.difficulty, qtype: q.qtype, approachTags: q.approach_tags || [] };
+  },
+  buildDomainResults(answers) {
+    const totals = {};
+    answers.forEach(a => {
+      if (!a.domain) return;
+      if (!totals[a.domain]) totals[a.domain] = { correct: 0, total: 0 };
+      totals[a.domain].total++;
+      if (a.correct) totals[a.domain].correct++;
+    });
+    return Object.entries(totals).map(([domain, values]) => ({ domain, ...values, percent: Math.round(values.correct / values.total * 100) }));
+  },
+  buildBreakdowns(answers) {
+    const totals = { ecoDomain: {}, approach: {}, difficulty: {}, qtype: {}, ecoTask: {}, domain: {} };
+    const add = (dimension, key, correct) => {
+      if (!key) return;
+      if (!totals[dimension][key]) totals[dimension][key] = { correct: 0, total: 0 };
+      totals[dimension][key].total++;
+      if (correct) totals[dimension][key].correct++;
+    };
+    answers.forEach(a => {
+      add('domain', a.domain, a.correct); add('ecoDomain', a.ecoDomain, a.correct);
+      add('difficulty', a.difficulty, a.correct); add('qtype', a.qtype, a.correct); add('ecoTask', a.ecoTask, a.correct);
+      (a.approachTags || []).forEach(tag => add('approach', tag, a.correct));
+    });
+    return Object.fromEntries(Object.entries(totals).map(([dimension, values]) => [
+      dimension, Object.entries(values).map(([key, count]) => ({ key, ...count, percent: Math.round(count.correct / count.total * 100) })),
+    ]));
   },
   selectTrialQuestions(allQuestions, n) { return this.shuffle([...allQuestions]).slice(0, n); },
 };
@@ -235,16 +293,44 @@ const StatsManager = {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
     const recent = history.filter(r => new Date(r.date) >= cutoff);
     if (!recent.length) return null;
-    return Math.round(recent.reduce((s, r) => s + r.percent, 0) / recent.length);
+    const totals = recent.reduce((sum, r) => ({ correct: sum.correct + (Number.isFinite(r.correct) ? r.correct : r.percent * (r.total || 1) / 100), total: sum.total + (r.total || 1) }), { correct: 0, total: 0 });
+    return Math.round(totals.correct / totals.total * 100);
   },
   getPerDomain(questions) {
     const history = Storage.getHistory();
     const domains = [...new Set(questions.map(q => q.domain).filter(Boolean))].sort();
     return domains.map(domain => {
       const entries = history.flatMap(r => r.domainResults || []).filter(d => d.domain === domain);
-      if (!entries.length) return { domain, percent: null };
-      return { domain, percent: Math.round(entries.reduce((s, d) => s + d.percent, 0) / entries.length) };
+      if (!entries.length) return { domain, percent: null, total: 0 };
+      const counted = entries.filter(entry => Number.isFinite(entry.correct) && Number.isFinite(entry.total));
+      if (!counted.length) return { domain, percent: Math.round(entries.reduce((s, d) => s + d.percent, 0) / entries.length), total: null };
+      const correct = counted.reduce((sum, entry) => sum + entry.correct, 0);
+      const total = counted.reduce((sum, entry) => sum + entry.total, 0);
+      return { domain, percent: Math.round(correct / total * 100), total };
     });
+  },
+  getRecommendation(questions) {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    let answerCount = 0;
+    const recent = [];
+    Storage.getHistory().slice().reverse().forEach(result => {
+      if (answerCount >= 100 || new Date(result.date) < cutoff || !result.breakdowns) return;
+      recent.push(result);
+      answerCount += result.total || 0;
+    });
+    if (answerCount < 20) return null;
+    const candidates = ['ecoDomain', 'approach', 'qtype', 'domain'].flatMap(dimension => {
+      const keys = new Set(recent.flatMap(result => (result.breakdowns?.[dimension] || []).map(item => item.key)));
+      return [...keys].map(key => {
+        const entries = recent.flatMap(result => result.breakdowns?.[dimension] || []).filter(item => item.key === key);
+        const correct = entries.reduce((sum, item) => sum + item.correct, 0);
+        const total = entries.reduce((sum, item) => sum + item.total, 0);
+        const percent = Math.round(correct / total * 100);
+        const filters = filterForSegment(dimension, key);
+        return { dimension, key, total, percent, priority: (total - correct) * (1 - percent / 100), filters };
+      });
+    }).filter(item => item.total >= 5 && QuizEngine.countAvailable(questions, 'quick', item.filters) >= 10);
+    return candidates.sort((a, b) => b.priority - a.priority || a.percent - b.percent)[0] || null;
   },
   getTotals() {
     const h = Storage.getHistory();
@@ -327,6 +413,9 @@ test('recordConfidence accumulates across calls', () => {
 console.log('\nQuizEngine:');
 const mockQs = Array.from({ length: 20 }, (_, i) => ({
   id: i + 1, domain: i % 2 === 0 ? 'Risk' : 'Cost',
+  eco_domain: i % 2 === 0 ? 'Process' : 'People', eco_task: 'Process-1',
+  difficulty: i % 3 === 0 ? 'hard' : 'medium', qtype: i % 4 === 0 ? 'calculation' : 'scenario',
+  source_pool: i === 1 ? 'agile' : 'pmbok', approach_tags: i % 2 === 0 ? ['agile'] : [],
   question: `Q${i+1}`, answers: ['A','B','C','D'], correct: 0, explanation: 'E',
 }));
 
@@ -336,6 +425,18 @@ test('selectQuestions daily returns <= 30', () => assert(QuizEngine.selectQuesti
 test('selectQuestions quick returns 10', () => assertEqual(QuizEngine.selectQuestions(mockQs,'quick').length, 10));
 test('selectQuestions filters by domain', () => {
   assert(QuizEngine.selectQuestions(mockQs,'quick',['Risk']).every(q => q.domain === 'Risk'));
+});
+test('matchesFilters combines OR within an axis and AND across axes', () => {
+  const selected = QuizEngine.selectQuestions(mockQs, 'quick', { ...emptyFilters(), ecoDomains: ['Process', 'People'], qtypes: ['calculation'] }, [], 20);
+  assert(selected.length > 0 && selected.every(q => q.qtype === 'calculation'));
+});
+test('Agile filtering uses approach_tags even outside an Agile domain', () => {
+  const selected = QuizEngine.selectQuestions(mockQs, 'quick', { ...emptyFilters(), approachTags: ['agile'] }, [], 20);
+  assert(selected.length > 0 && selected.every(q => q.approach_tags.includes('agile')));
+  assert(selected.some(q => q.domain !== 'Agile'));
+});
+test('source_pool is not a user-facing filter axis', () => {
+  assert(QuizEngine.matchesFilters(mockQs[0], { ...emptyFilters(), sourcePools: ['agile'] }));
 });
 test('shuffleAnswers preserves correct answer text', () => {
   const q = { answers: ['W','X','Y','Z'], correct: 2 };
@@ -394,6 +495,15 @@ test('recordAnswer wrong with confidence=1 increments', () => {
   reset();
   QuizEngine.recordAnswer(10, false, 1);
   assertEqual(Storage.getWeakQuestions()[10], 1);
+});
+test('buildBreakdowns stores counts and includes each approach tag', () => {
+  const answers = [
+    QuizEngine.answerRecord({ ...mockQs[0], approach_tags: ['agile', 'hybrid'] }, false),
+    QuizEngine.answerRecord({ ...mockQs[2], approach_tags: ['agile'] }, true),
+  ];
+  const breakdowns = QuizEngine.buildBreakdowns(answers);
+  assertEqual(breakdowns.approach.find(item => item.key === 'agile'), { key: 'agile', correct: 1, total: 2, percent: 50 });
+  assertEqual(breakdowns.approach.find(item => item.key === 'hybrid'), { key: 'hybrid', correct: 0, total: 1, percent: 0 });
 });
 
 // ===== STREAK MANAGER TESTS =====
@@ -494,6 +604,22 @@ test('getPerDomain returns all domains', () => {
   reset();
   const domains = StatsManager.getPerDomain(mockQs);
   assert(domains.length > 0);
+});
+test('getPerDomain weights modern session counts instead of averaging percentages', () => {
+  reset();
+  Storage.saveResult({ domainResults: [{ domain: 'Risk', correct: 1, total: 1, percent: 100 }] });
+  Storage.saveResult({ domainResults: [{ domain: 'Risk', correct: 0, total: 9, percent: 0 }] });
+  const risk = StatsManager.getPerDomain(mockQs).find(item => item.domain === 'Risk');
+  assertEqual(risk.percent, 10);
+});
+test('recommendation ignores a segment with fewer than five answers', () => {
+  reset();
+  const pool = Array.from({ length: 12 }, (_, i) => ({ ...mockQs[0], id: i + 100, eco_domain: 'Process', approach_tags: ['agile'] }));
+  Storage.saveResult({ date: TODAY(), total: 20, breakdowns: {
+    ecoDomain: [{ key: 'Process', correct: 8, total: 20, percent: 40 }],
+    approach: [{ key: 'agile', correct: 0, total: 4, percent: 0 }],
+  } });
+  assertEqual(StatsManager.getRecommendation(pool).key, 'Process');
 });
 
 // ===== TRIAL EXAM TESTS (plan 12, sekcja 19a) =====

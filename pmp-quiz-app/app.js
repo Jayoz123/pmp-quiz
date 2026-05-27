@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-4267e665';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-13a6b24f';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -74,9 +74,54 @@ const DOMAIN_I18N = {
   'Harmonogram': 'Schedule', 'Integracja': 'Integration', 'Interesariusz': 'Stakeholder',
   'Jakość': 'Quality', 'Komunikacja': 'Communications', 'Koszt': 'Cost', 'Ludzie': 'People',
   'Nabywanie': 'Procurement', 'Ogólny': 'General', 'Proces': 'Process', 'Ryzyko': 'Risk',
-  'Zakres': 'Scope', 'Zasoby': 'Resource', 'Środowisko biznesowe': 'Business Environment',
+  'Zakres': 'Scope', 'Zasoby': 'Resource', 'Środowisko biznesowe': 'Business Environment', 'Zwinne': 'Agile',
 };
 const tDomain = d => (AppState.showEnglish ? (DOMAIN_I18N[d] || d) : d);
+const ECO_I18N = {
+  People: { pl: 'People', en: 'People' },
+  Process: { pl: 'Process', en: 'Process' },
+  'Business Environment': { pl: 'Business Environment', en: 'Business Environment' },
+};
+const APPROACH_I18N = {
+  agile: { pl: 'Agile', en: 'Agile' },
+  hybrid: { pl: 'Hybrydowe', en: 'Hybrid' },
+  predictive: { pl: 'Predykcyjne', en: 'Predictive' },
+};
+const QTYPE_I18N = {
+  scenario: { pl: 'Scenariuszowe', en: 'Scenario' },
+  knowledge: { pl: 'Wiedzowe', en: 'Knowledge' },
+  calculation: { pl: 'Obliczeniowe', en: 'Calculation' },
+};
+const DIFFICULTY_I18N = {
+  easy: { pl: 'Łatwe', en: 'Easy' },
+  medium: { pl: 'Średnie', en: 'Medium' },
+  hard: { pl: 'Trudne', en: 'Hard' },
+};
+const labelFor = (labels, key) => labels[key]?.[L()] || key;
+const tEcoDomain = key => labelFor(ECO_I18N, key);
+const tApproach = key => labelFor(APPROACH_I18N, key);
+const tQtype = key => labelFor(QTYPE_I18N, key);
+const tDifficulty = key => labelFor(DIFFICULTY_I18N, key);
+const emptyFilters = () => ({ domains: [], ecoDomains: [], approachTags: [], difficulties: [], qtypes: [] });
+const filterForSegment = (dimension, key) => {
+  const filters = emptyFilters();
+  const filterKey = { domain: 'domains', ecoDomain: 'ecoDomains', approach: 'approachTags', difficulty: 'difficulties', qtype: 'qtypes' }[dimension];
+  if (filterKey) filters[filterKey] = [key];
+  return filters;
+};
+const labelForSegment = (dimension, key) => ({
+  domain: tDomain, ecoDomain: tEcoDomain, approach: tApproach, difficulty: tDifficulty, qtype: tQtype,
+}[dimension] || (v => v))(key);
+const quizTagsHtml = (question, extended = false) => {
+  const tags = [
+    question.domain && { text: tDomain(question.domain), className: 'quiz-tag--domain' },
+    question.eco_domain && { text: tEcoDomain(question.eco_domain), className: 'quiz-tag--eco' },
+    ...(question.approach_tags || []).map(tag => ({ text: tApproach(tag), className: 'quiz-tag--approach' })),
+  ].filter(Boolean);
+  if (extended && question.qtype) tags.push({ text: tQtype(question.qtype), className: 'quiz-tag--detail' });
+  if (extended && question.difficulty) tags.push({ text: tDifficulty(question.difficulty), className: 'quiz-tag--detail' });
+  return tags.map(tag => `<span class="quiz-tag ${tag.className}">${tag.text}</span>`).join('');
+};
 
 const I18N = {
   // login
@@ -139,7 +184,7 @@ const I18N = {
   daily_done:         { pl: '30 pytań · Ukończono dziś ✓',      en: '30 questions · Done today ✓' },
   daily_pending:      { pl: '30 pytań · Wymagane dziś',         en: '30 questions · Required today' },
   quick_quiz:         { pl: 'Szybki Quiz',                      en: 'Quick Quiz' },
-  quick_quiz_sub:     { pl: '10 pytań · losowe',                en: '10 questions · random' },
+  quick_quiz_sub:     { pl: 'Trening celowany lub losowy',       en: 'Targeted or random training' },
   statistics:         { pl: 'Statystyki',                       en: 'Statistics' },
   your_progress:      { pl: 'Twój postęp',                      en: 'Your progress' },
   // settings modal
@@ -163,8 +208,18 @@ const I18N = {
   // mode select
   back:               { pl: '‹ Wróć',                           en: '‹ Back' },
   standard_quiz:      { pl: '⚡ Standardowy Quiz',              en: '⚡ Standard Quiz' },
-  standard_quiz_desc: { pl: '10 losowych pytań z wybranych domen', en: '10 random questions from selected domains' },
+  standard_quiz_desc: { pl: 'Wybierz trening',                  en: 'Choose training' },
   filter_domains:     { pl: 'Filtruj domeny (domyślnie wszystkie):', en: 'Filter domains (all by default):' },
+  filter_eco:         { pl: 'Domena egzaminu ECO',              en: 'ECO exam domain' },
+  filter_approach:    { pl: 'Podejście',                        en: 'Approach' },
+  filter_qtype:       { pl: 'Typ pytań',                        en: 'Question type' },
+  filter_difficulty:  { pl: 'Trudność',                         en: 'Difficulty' },
+  preset_all:         { pl: 'Wszystkie',                        en: 'All' },
+  preset_calculation: { pl: 'Obliczenia',                       en: 'Calculations' },
+  customize_scope:    { pl: 'Dostosuj zakres',                  en: 'Customize scope' },
+  count_label:        { pl: 'Liczba pytań',                     en: 'Number of questions' },
+  available_count:    { pl: 'Dostępnych pytań: {n}',            en: 'Available questions: {n}' },
+  pool_too_small:     { pl: 'Dostępnych jest tylko {n} pytań. Zmień filtry lub liczbę pytań.', en: 'Only {n} questions are available. Change filters or question count.' },
   weak_questions:     { pl: '🎯 Moje słabe pytania',            en: '🎯 My weak questions' },
   weak_locked:        { pl: 'Ukończ pierwszy quiz, żeby odblokować', en: 'Complete your first quiz to unlock' },
   weak_none:          { pl: 'Nie masz jeszcze słabych pytań 🎉', en: "You don't have any weak questions yet 🎉" },
@@ -204,6 +259,8 @@ const I18N = {
   best_streak:        { pl: 'Najlepsza seria:',                 en: 'Best streak:' },
   in_a_row:           { pl: '{n} pod rząd',                     en: '{n} in a row' },
   weakest_domain:     { pl: 'Najsłabsza domena:',               en: 'Weakest domain:' },
+  most_difficulty:    { pl: 'Najwięcej trudności:',             en: 'Most difficulty:' },
+  train_area:         { pl: 'Ćwicz ten obszar',                 en: 'Train this area' },
   play_again:         { pl: 'Zagraj ponownie',                  en: 'Play again' },
   // stats
   avg_correct:        { pl: 'Średnia poprawnych odpowiedzi',    en: 'Average correct answers' },
@@ -214,6 +271,17 @@ const I18N = {
   quizzes:            { pl: 'Quizy',                            en: 'Quizzes' },
   questions:          { pl: 'Pytania',                          en: 'Questions' },
   per_domain:         { pl: 'Per domena',                       en: 'Per domain' },
+  preparation_analysis:{ pl: 'Analiza przygotowania',           en: 'Readiness analysis' },
+  tab_ecoDomain:      { pl: 'Domeny ECO',                       en: 'ECO Domains' },
+  tab_approach:       { pl: 'Podejścia',                        en: 'Approaches' },
+  tab_domain:         { pl: 'Obszary',                          en: 'Topics' },
+  tab_qtype:          { pl: 'Typ pytań',                        en: 'Question Type' },
+  tab_difficulty:     { pl: 'Trudność',                         en: 'Difficulty' },
+  data_since_update:  { pl: 'Dane od aktualizacji klasyfikacji', en: 'Data since classification update' },
+  no_data:            { pl: 'Brak danych',                      en: 'No data' },
+  responses:          { pl: 'odp.',                             en: 'ans.' },
+  recommended_training:{ pl: 'Polecany trening',                en: 'Recommended training' },
+  practice_10:        { pl: 'Ćwicz 10 pytań',                   en: 'Practice 10 questions' },
   activity_30:        { pl: 'Aktywność',                        en: 'Activity' },
   activity_history:   { pl: 'Historia aktywności',              en: 'Activity History' },
   badges:             { pl: 'Odznaki',                          en: 'Badges' },
@@ -434,7 +502,7 @@ const SupabaseSync = {
     } catch (e) { console.warn('pushProgress failed:', e); }
   },
 
-  async saveQuizSession({ mode, correct, total, percent, domainResults, examLength, durationSec, timeLeftSec, rating }) {
+  async saveQuizSession({ mode, correct, total, percent, domainResults, breakdowns, examLength, durationSec, timeLeftSec, rating }) {
     try {
       const { data: { user } } = await sb().auth.getUser();
       if (!user) return;
@@ -445,6 +513,7 @@ const SupabaseSync = {
         total,
         percent,
         domains: domainResults || [],
+        breakdowns: breakdowns || {},
       };
       // Pola egzaminu Trial — wymagają migracji 12_trial_exam.sql; wysyłane tylko
       // gdy podane (tryby quiz/daily/quick/weak ich nie dosyłają).
@@ -696,15 +765,39 @@ const QuizEngine = {
     return a;
   },
 
+  normalizeFilters(filters) {
+    if (Array.isArray(filters)) return { ...emptyFilters(), domains: filters };
+    return { ...emptyFilters(), ...(filters || {}) };
+  },
+
+  matchesFilters(question, filters = {}) {
+    const f = this.normalizeFilters(filters);
+    const selectedIn = (values, value) => values.length === 0 || values.includes(value);
+    return selectedIn(f.domains, question.domain)
+      && selectedIn(f.ecoDomains, question.eco_domain)
+      && selectedIn(f.difficulties, question.difficulty)
+      && selectedIn(f.qtypes, question.qtype)
+      && (f.approachTags.length === 0
+        || (question.approach_tags || []).some(tag => f.approachTags.includes(tag)));
+  },
+
+  countAvailable(allQuestions, mode, filters = {}) {
+    const matching = allQuestions.filter(q => this.matchesFilters(q, filters));
+    if (mode !== 'weak') return matching.length;
+    const weak = Storage.getWeakQuestions();
+    return matching.filter(q => (weak[q.id] || 0) > 0).length;
+  },
+
   // FIX #4 — SRS cooldown: recentlyShown prevents repeating weak questions
-  selectQuestions(allQuestions, mode, domains = [], recentlyShown = []) {
+  selectQuestions(allQuestions, mode, filters = {}, recentlyShown = [], requestedSize = null) {
+    const matching = allQuestions.filter(q => this.matchesFilters(q, filters));
     if (mode === 'weak') {
       const wq = Storage.getWeakQuestions();
       const cooldownIds = new Set(recentlyShown.slice(-SRS_COOLDOWN));
 
       // First pass: exclude recently shown
       let pool = [];
-      allQuestions.forEach(q => {
+      matching.forEach(q => {
         const count = wq[q.id] || 0;
         if (count > 0 && !cooldownIds.has(q.id)) {
           for (let i = 0; i < Math.min(count * 3, 9); i++) pool.push(q);
@@ -712,7 +805,7 @@ const QuizEngine = {
       });
       // If pool too small, fall back to including cooled-down items
       if (pool.length < QUIZ_SIZES.weak) {
-        allQuestions.forEach(q => {
+        matching.forEach(q => {
           const count = wq[q.id] || 0;
           if (count > 0 && cooldownIds.has(q.id)) pool.push(q);
         });
@@ -723,11 +816,8 @@ const QuizEngine = {
         .filter(q => { if (seen.has(q.id)) return false; seen.add(q.id); return true; })
         .slice(0, QUIZ_SIZES.weak);
     }
-    let pool = domains.length > 0
-      ? allQuestions.filter(q => domains.includes(q.domain))
-      : [...allQuestions];
-    const size = mode === 'daily' ? QUIZ_SIZES.daily : QUIZ_SIZES.quick;
-    return this.shuffle(pool).slice(0, size);
+    const size = requestedSize || (mode === 'daily' ? QUIZ_SIZES.daily : QUIZ_SIZES.quick);
+    return this.shuffle(matching).slice(0, size);
   },
 
   // Bilingual support: keeps PL and EN answers in sync through shuffling
@@ -764,6 +854,66 @@ const QuizEngine = {
       }
     }
     Storage.saveWeakQuestions(wq);
+  },
+
+  answerRecord(question, correct) {
+    return {
+      questionId: question.id,
+      correct,
+      domain: question.domain,
+      ecoDomain: question.eco_domain,
+      ecoTask: question.eco_task,
+      difficulty: question.difficulty,
+      qtype: question.qtype,
+      approachTags: question.approach_tags || [],
+    };
+  },
+
+  buildDomainResults(answers) {
+    const totals = {};
+    answers.forEach(answer => {
+      if (!answer.domain) return;
+      if (!totals[answer.domain]) totals[answer.domain] = { correct: 0, total: 0 };
+      totals[answer.domain].total++;
+      if (answer.correct) totals[answer.domain].correct++;
+    });
+    return Object.entries(totals).map(([domain, values]) => ({
+      domain, ...values, percent: Math.round((values.correct / values.total) * 100),
+    }));
+  },
+
+  buildBreakdowns(answers) {
+    const totals = { ecoDomain: {}, approach: {}, difficulty: {}, qtype: {}, ecoTask: {}, domain: {} };
+    const add = (dimension, key, correct) => {
+      if (!key) return;
+      if (!totals[dimension][key]) totals[dimension][key] = { correct: 0, total: 0 };
+      totals[dimension][key].total++;
+      if (correct) totals[dimension][key].correct++;
+    };
+    answers.forEach(answer => {
+      add('domain', answer.domain, answer.correct);
+      add('ecoDomain', answer.ecoDomain, answer.correct);
+      add('difficulty', answer.difficulty, answer.correct);
+      add('qtype', answer.qtype, answer.correct);
+      add('ecoTask', answer.ecoTask, answer.correct);
+      (answer.approachTags || []).forEach(tag => add('approach', tag, answer.correct));
+    });
+    return Object.fromEntries(Object.entries(totals).map(([dimension, values]) => [
+      dimension,
+      Object.entries(values).map(([key, count]) => ({
+        key, ...count, percent: Math.round((count.correct / count.total) * 100),
+      })),
+    ]));
+  },
+
+  weakestSegment(breakdowns, minAnswers = 3) {
+    const dimensions = ['ecoDomain', 'approach', 'qtype', 'domain'];
+    const segments = dimensions.flatMap(dimension => (breakdowns[dimension] || [])
+      .filter(item => item.total >= minAnswers)
+      .map(item => ({ dimension, ...item, filters: filterForSegment(dimension, item.key) })));
+    return segments.sort((a, b) =>
+      a.percent - b.percent || (b.total - b.correct) - (a.total - a.correct) || b.total - a.total
+    )[0] || null;
   },
 
   // Trial Exam — losowo z całej puli, bez powtórzeń (plan 12, sekcja 4).
@@ -985,16 +1135,65 @@ const StatsManager = {
     const cutoff  = new Date(); cutoff.setDate(cutoff.getDate() - days);
     const recent  = history.filter(r => new Date(r.date) >= cutoff);
     if (!recent.length) return null;
-    return Math.round(recent.reduce((s, r) => s + r.percent, 0) / recent.length);
+    const totals = recent.reduce((sum, result) => ({
+      correct: sum.correct + (Number.isFinite(result.correct) ? result.correct : (result.percent || 0) * (result.total || 1) / 100),
+      total: sum.total + (result.total || 1),
+    }), { correct: 0, total: 0 });
+    return Math.round((totals.correct / totals.total) * 100);
   },
   getPerDomain(questions) {
     const history = Storage.getHistory();
     const domains = [...new Set(questions.map(q => q.domain).filter(Boolean))].sort();
     return domains.map(domain => {
       const entries = history.flatMap(r => r.domainResults || []).filter(d => d.domain === domain);
-      if (!entries.length) return { domain, percent: null };
-      return { domain, percent: Math.round(entries.reduce((s, d) => s + d.percent, 0) / entries.length) };
+      if (!entries.length) return { domain, percent: null, total: 0 };
+      const counted = entries.filter(entry => Number.isFinite(entry.correct) && Number.isFinite(entry.total));
+      if (!counted.length) {
+        return { domain, percent: Math.round(entries.reduce((s, entry) => s + entry.percent, 0) / entries.length), total: null };
+      }
+      const correct = counted.reduce((sum, entry) => sum + entry.correct, 0);
+      const total = counted.reduce((sum, entry) => sum + entry.total, 0);
+      return { domain, percent: Math.round((correct / total) * 100), total };
     });
+  },
+  getBreakdown(dimension, questions) {
+    const values = {
+      ecoDomain: Object.keys(ECO_I18N),
+      approach: Object.keys(APPROACH_I18N),
+      qtype: Object.keys(QTYPE_I18N),
+      difficulty: Object.keys(DIFFICULTY_I18N),
+      domain: [...new Set(questions.map(q => q.domain).filter(Boolean))].sort(),
+    }[dimension] || [];
+    const entries = Storage.getHistory().flatMap(result => result.breakdowns?.[dimension] || []);
+    return values.map(key => {
+      const matching = entries.filter(entry => entry.key === key);
+      const correct = matching.reduce((sum, entry) => sum + (entry.correct || 0), 0);
+      const total = matching.reduce((sum, entry) => sum + (entry.total || 0), 0);
+      return { key, correct, total, percent: total ? Math.round((correct / total) * 100) : null };
+    });
+  },
+  getRecommendation(questions) {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    let answerCount = 0;
+    const recent = [];
+    Storage.getHistory().slice().reverse().forEach(result => {
+      if (answerCount >= 100 || new Date(result.date) < cutoff || !result.breakdowns) return;
+      recent.push(result);
+      answerCount += result.total || 0;
+    });
+    if (answerCount < 20) return null;
+    const candidates = ['ecoDomain', 'approach', 'qtype', 'domain'].flatMap(dimension => {
+      const keys = new Set(recent.flatMap(result => (result.breakdowns[dimension] || []).map(item => item.key)));
+      return [...keys].map(key => {
+        const entries = recent.flatMap(result => result.breakdowns[dimension] || []).filter(item => item.key === key);
+        const correct = entries.reduce((sum, item) => sum + item.correct, 0);
+        const total = entries.reduce((sum, item) => sum + item.total, 0);
+        const percent = total ? Math.round((correct / total) * 100) : 0;
+        const filters = filterForSegment(dimension, key);
+        return { dimension, key, correct, total, percent, filters, priority: (total - correct) * (1 - percent / 100) };
+      });
+    }).filter(item => item.total >= 5 && QuizEngine.countAvailable(questions, 'quick', item.filters) >= 10);
+    return candidates.sort((a, b) => b.priority - a.priority || a.percent - b.percent)[0] || null;
   },
   getTotals() {
     const h = Storage.getHistory();
@@ -1555,6 +1754,7 @@ Views.home = {
     const streak     = StreakManager.getCurrentStreak();
     const dailyDone  = StreakManager.isDailyDoneToday();
     const weekDays   = StreakManager.getWeekDays();
+    const recommended = StatsManager.getRecommendation(AppState.questions);
 
     const streakLabel = streak === 0 ? t('streak_start')
       : streak === 1 ? t('streak_one')
@@ -1607,6 +1807,13 @@ Views.home = {
           </button>
         </div>
         <div class="menu">
+          ${recommended ? `
+          <div class="recommended-training">
+            <div class="recommended-training__title">${t('recommended_training')}</div>
+            <div class="recommended-training__area">${labelForSegment(recommended.dimension, recommended.key)}</div>
+            <div class="recommended-training__score">${recommended.percent}% · ${recommended.total} ${t('responses')}</div>
+            <button class="btn-primary" onclick="Views['mode-select']._applyTraining('${recommended.dimension}', '${recommended.key}')">${t('practice_10')}</button>
+          </div>` : ''}
           <button class="menu-btn" onclick="App.navigate('mode-select')">
             <span class="menu-btn__icon">⚡</span>
             <div class="menu-btn__content">
@@ -1807,7 +2014,10 @@ Views.home = {
 // ==================== MODE SELECT VIEW ====================
 Views['mode-select'] = {
   _selectedMode: 'quick',
-  _selectedDomains: [],
+  _preset: 'all',
+  _count: 10,
+  _advanced: false,
+  _filters: emptyFilters(),
 
   render() {
     const domains    = [...new Set(AppState.questions.map(q => q.domain).filter(Boolean))].sort();
@@ -1817,13 +2027,10 @@ Views['mode-select'] = {
     //          albo brak ukończonego quizu, albo 0 słabych pytań do powtórki.
     const neverPlayed  = !Storage.hasCompletedAnyQuiz();
     const weakDisabled = neverPlayed || weakCount === 0;
-    const self = Views['mode-select'];
-
-    const domainChips = domains.map(d => {
-      const sel = self._selectedDomains.includes(d);
-      return `<div class="domain-chip ${sel ? 'selected' : ''}"
-                   onclick="Views['mode-select']._toggleDomain('${d}')">${tDomain(d)}</div>`;
-    }).join('');
+    const available = QuizEngine.countAvailable(AppState.questions, this._selectedMode, this._filters);
+    const renderChips = (axis, values, labelFn) => values.map(value => `
+      <button class="domain-chip ${this._filters[axis].includes(value) ? 'selected' : ''}"
+              onclick="Views['mode-select']._toggleFilter('${axis}', '${value}')">${labelFn(value)}</button>`).join('');
 
     let weakSubtitle;
     if (neverPlayed)      weakSubtitle = t('weak_locked');
@@ -1833,21 +2040,35 @@ Views['mode-select'] = {
     return `
       <div class="screen mode-select">
         <h2>${t('quick_quiz')}</h2>
-        <div class="mode-card ${self._selectedMode === 'quick' ? 'selected' : ''}"
-             onclick="Views['mode-select']._selectMode('quick')">
+        <div class="mode-card ${this._selectedMode === 'quick' ? 'selected' : ''}">
           <h3>${t('standard_quiz')}</h3>
           <p>${t('standard_quiz_desc')}</p>
-          <div class="domain-filter" style="margin-top:12px">
-            <label>${t('filter_domains')}</label>
-            <div class="domain-chips">${domainChips}</div>
+          <div class="preset-chips">
+            <button class="preset-chip ${this._preset === 'all' && this._selectedMode === 'quick' ? 'selected' : ''}" onclick="Views['mode-select']._setPreset('all')">${t('preset_all')}</button>
+            <button class="preset-chip ${this._preset === 'agile' ? 'selected' : ''}" onclick="Views['mode-select']._setPreset('agile')">Agile</button>
+            <button class="preset-chip ${this._preset === 'calculation' ? 'selected' : ''}" onclick="Views['mode-select']._setPreset('calculation')">${t('preset_calculation')}</button>
+            <button class="preset-chip ${this._selectedMode === 'weak' ? 'selected' : ''} ${weakDisabled ? 'disabled' : ''}"
+                    ${weakDisabled ? 'disabled' : "onclick=\"Views['mode-select']._setPreset('weak')\""}>${t('weak_questions')}</button>
           </div>
+          <button class="filters-toggle" onclick="Views['mode-select']._toggleAdvanced()">${t('customize_scope')} ${this._advanced ? '▲' : '▼'}</button>
+          ${this._advanced ? `
+          <div class="filters-advanced">
+            <div class="filter-section"><label>${t('filter_eco')}</label><div class="domain-chips">${renderChips('ecoDomains', Object.keys(ECO_I18N), tEcoDomain)}</div></div>
+            <div class="filter-section"><label>${t('filter_approach')}</label><div class="domain-chips">${renderChips('approachTags', Object.keys(APPROACH_I18N), tApproach)}</div></div>
+            <div class="filter-section"><label>${t('filter_domains')}</label><div class="domain-chips">${renderChips('domains', domains, tDomain)}</div></div>
+            <div class="filter-section"><label>${t('filter_qtype')}</label><div class="domain-chips">${renderChips('qtypes', Object.keys(QTYPE_I18N), tQtype)}</div></div>
+            <div class="filter-section"><label>${t('filter_difficulty')}</label><div class="domain-chips">${renderChips('difficulties', Object.keys(DIFFICULTY_I18N), tDifficulty)}</div></div>
+          </div>` : ''}
         </div>
-        <div class="mode-card ${self._selectedMode === 'weak' ? 'selected' : ''} ${weakDisabled ? 'disabled' : ''}"
-             ${weakDisabled ? '' : "onclick=\"Views['mode-select']._selectMode('weak')\""}>
-          <h3>${t('weak_questions')}</h3>
-          <p>${weakSubtitle}</p>
-        </div>
+        <p class="weak-status">${weakSubtitle}</p>
+        ${this._selectedMode === 'quick' ? `
+        <div class="question-count">
+          <label>${t('count_label')}</label>
+          <div class="preset-chips">${[10, 20, 30].map(count => `<button class="preset-chip ${this._count === count ? 'selected' : ''}" onclick="Views['mode-select']._setCount(${count})">${count}</button>`).join('')}</div>
+        </div>` : ''}
+        <div class="filter-count ${this._selectedMode === 'quick' && available < this._count ? 'filter-count--warning' : ''}">${t('available_count', { n: available })}</div>
         <button class="btn-primary" style="margin-top:8px"
+                ${this._selectedMode === 'quick' && available < this._count ? 'disabled' : ''}
                 onclick="Views['mode-select']._startQuiz()">
           ${t('start')}
         </button>
@@ -1855,16 +2076,36 @@ Views['mode-select'] = {
       </div>`;
   },
 
-  _toggleDomain(domain) {
-    const idx = this._selectedDomains.indexOf(domain);
-    if (idx >= 0) this._selectedDomains.splice(idx, 1);
-    else          this._selectedDomains.push(domain);
+  _setPreset(preset) {
+    this._preset = preset;
+    this._filters = emptyFilters();
+    this._selectedMode = preset === 'weak' ? 'weak' : 'quick';
+    if (preset === 'agile') this._filters.approachTags = ['agile'];
+    if (preset === 'calculation') this._filters.qtypes = ['calculation'];
     App.render();
   },
 
-  _selectMode(mode) {
-    this._selectedMode = mode;
+  _toggleAdvanced() { this._advanced = !this._advanced; App.render(); },
+
+  _toggleFilter(axis, value) {
+    this._selectedMode = 'quick';
+    this._preset = 'custom';
+    const selected = this._filters[axis];
+    const idx = selected.indexOf(value);
+    if (idx >= 0) selected.splice(idx, 1);
+    else selected.push(value);
     App.render();
+  },
+
+  _setCount(count) { this._count = count; App.render(); },
+
+  _applyTraining(dimension, key) {
+    this._selectedMode = 'quick';
+    this._preset = 'custom';
+    this._count = 10;
+    this._advanced = true;
+    this._filters = filterForSegment(dimension, key);
+    App.navigate('mode-select');
   },
 
   _startQuiz() {
@@ -1872,17 +2113,20 @@ Views['mode-select'] = {
       alert(t('weak_alert'));
       return;
     }
+    const available = QuizEngine.countAvailable(AppState.questions, this._selectedMode, this._filters);
+    if (this._selectedMode === 'quick' && available < this._count) {
+      alert(t('pool_too_small', { n: available }));
+      return;
+    }
     const recentlyShown = AppState.quizSession?.recentlyShown || [];
     const questions = QuizEngine.selectQuestions(
-      AppState.questions, this._selectedMode, this._selectedDomains, recentlyShown
+      AppState.questions, this._selectedMode, this._filters, recentlyShown, this._count
     );
     if (!questions.length) {
       alert(t('no_questions_filter'));
       return;
     }
-    AppState.quizSession    = { questions, current: 0, answers: [], mode: this._selectedMode, shuffledMap: {}, recentlyShown: [], currentAnswer: null };
-    this._selectedDomains   = [];
-    this._selectedMode      = 'quick';
+    AppState.quizSession = { questions, current: 0, answers: [], mode: this._selectedMode, filters: this._filters, shuffledMap: {}, recentlyShown: [], currentAnswer: null };
     App.navigate('quiz');
   },
 
@@ -2165,7 +2409,7 @@ Views.trial = {
     if (!s) { App.navigate('home'); return; }
 
     let correct = 0;
-    const domainMap = {};
+    const answerRecords = [];
     const review = [];               // pełny przegląd na ekran wyników
     s.questions.forEach((q, i) => {
       const map = s.shuffledMap[i] || QuizEngine.shuffleAnswers(q);
@@ -2174,30 +2418,25 @@ Views.trial = {
       if (isCorrect) correct++;
       // egzamin zasila „moje słabe pytania" (bez confidence)
       QuizEngine.recordAnswer(q.id, isCorrect, null);
-      if (q.domain) {
-        if (!domainMap[q.domain]) domainMap[q.domain] = { correct: 0, total: 0 };
-        domainMap[q.domain].total++;
-        if (isCorrect) domainMap[q.domain].correct++;
-      }
+      answerRecords.push(QuizEngine.answerRecord(q, isCorrect));
       review.push({ i, q, map, sel, isCorrect, flagged: s.flags[i] });
     });
 
     const total   = s.questions.length;
     const percent = Math.round((correct / total) * 100);
-    const domainResults = Object.entries(domainMap).map(([domain, d]) => ({
-      domain, percent: Math.round((d.correct / d.total) * 100),
-    }));
+    const domainResults = QuizEngine.buildDomainResults(answerRecords);
+    const breakdowns = QuizEngine.buildBreakdowns(answerRecords);
     const timeLeftSec = Math.max(0, Math.round((s.endsAt - Date.now()) / 1000));
     const rating = trialRating(percent);
 
     const result = {
-      date: TODAY(), mode: 'trial', correct, total, percent, domainResults,
+      date: TODAY(), mode: 'trial', correct, total, percent, domainResults, breakdowns,
       examLength: total, durationSec: s.durationSec, timeLeftSec, timedOut, rating,
     };
     Storage.saveResult(result);              // trafia do quiz_history (i sync do chmury)
     StreakManager.markActivityDone();        // egzamin to aktywność, NIE daily
     SupabaseSync.saveQuizSession({
-      mode: 'trial', correct, total, percent, domainResults,
+      mode: 'trial', correct, total, percent, domainResults, breakdowns,
       examLength: total, durationSec: s.durationSec, timeLeftSec, rating,
     }).catch(console.error);
     SupabaseSync.pushProgress().catch(console.error);
@@ -2236,6 +2475,12 @@ Views['trial-result'] = {
         <div class="domain-bar__track"><div class="domain-bar__fill" style="width:0%" data-target="${d.percent}"></div></div>
         <span class="domain-bar__pct">${d.percent}%</span>
       </div>`).join('');
+    const ecoBars = (r.breakdowns?.ecoDomain || []).slice().sort((a, b) => a.percent - b.percent).map(item => `
+      <div class="domain-bar">
+        <span class="domain-bar__name">${tEcoDomain(item.key)}</span>
+        <div class="domain-bar__track"><div class="domain-bar__fill" style="width:0%" data-target="${item.percent}"></div></div>
+        <span class="domain-bar__pct">${item.percent}%</span>
+      </div>`).join('');
 
     const reviewItems = r.review.map(item => {
       const { i, q, map, sel, isCorrect, flagged } = item;
@@ -2261,7 +2506,7 @@ Views['trial-result'] = {
         <div class="trial-review__item ${isCorrect ? 'is-correct' : 'is-wrong'}">
           <div class="trial-review__head">
             <span class="trial-review__num">${i + 1}${flagged ? ' <span class="trial-review__flag">⚑︎</span>' : ''}</span>
-            ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
+            ${quizTagsHtml(q)}
             ${reportBtn}
           </div>
           <div class="trial-review__q">${qText}</div>
@@ -2289,6 +2534,7 @@ Views['trial-result'] = {
         </div>
         <p class="trial-result__disclaimer">${t('trial_rating_disclaimer')}</p>
         <div class="trial-result__time">${t('trial_time_used')}: <strong>${fmtHMS(usedSec)}</strong> ${t('trial_time_of')} ${fmtHMS(r.durationSec)}</div>
+        ${ecoBars ? `<div class="stats-card"><h3>${t('tab_ecoDomain')}</h3>${ecoBars}</div>` : ''}
         ${domainBars ? `<div class="stats-card"><h3>${t('trial_domains_title')}</h3>${domainBars}</div>` : ''}
         <div class="summary__actions">
           <button class="btn-secondary" onclick="App.navigate('home')">${t('back_to_menu')}</button>
@@ -2385,7 +2631,6 @@ Views.quiz = {
         <div class="quiz-header">
           <div class="quiz-header__left">
             <button class="quiz-abandon" onclick="Views.quiz._abandon()" title="${t('back_to_menu')}">✕</button>
-            ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
           </div>
           <span class="quiz-counter">${session.current + 1} / ${total}</span>
           <div class="quiz-header__right">
@@ -2396,6 +2641,7 @@ Views.quiz = {
         <div class="quiz-progress">
           <div class="quiz-progress__bar" style="width:${pct}%"></div>
         </div>
+        <div class="quiz-tags">${quizTagsHtml(q)}</div>
         <div class="quiz-question">${questionText}</div>
         <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
         <div id="explanation-panel" class="hidden"></div>
@@ -2527,7 +2773,7 @@ Views.quiz = {
 
     QuizEngine.recordAnswer(q.id, isCorrect, confidence);
     Storage.recordConfidence(q.id, confidence, isCorrect);
-    session.answers.push({ questionId: q.id, domain: q.domain, correct: isCorrect });
+    session.answers.push(QuizEngine.answerRecord(q, isCorrect));
 
     if (!session.recentlyShown) session.recentlyShown = [];
     session.recentlyShown.push(q.id);
@@ -2553,6 +2799,7 @@ Views.quiz = {
           <span class="explanation-verdict">${isCorrect ? t('verdict_correct') : t('verdict_wrong')}</span>
           ${explanationLangBtn}
         </div>
+        <div class="quiz-tags quiz-tags--feedback">${quizTagsHtml(q, true)}</div>
         <p class="explanation-text" id="expl-text">${explanationText}</p>
       </div>
       <button class="btn-next" onclick="Views.quiz._advance()">${t('next')}</button>`;
@@ -2617,18 +2864,11 @@ Views.quiz = {
     const total   = session.answers.length;
     const percent = Math.round((correct / total) * 100);
 
-    const domainMap = {};
-    session.answers.forEach(a => {
-      if (!a.domain) return;
-      if (!domainMap[a.domain]) domainMap[a.domain] = { correct: 0, total: 0 };
-      domainMap[a.domain].total++;
-      if (a.correct) domainMap[a.domain].correct++;
-    });
-    const domainResults = Object.entries(domainMap).map(([domain, d]) => ({
-      domain, percent: Math.round((d.correct / d.total) * 100),
-    }));
+    const domainResults = QuizEngine.buildDomainResults(session.answers);
+    const breakdowns = QuizEngine.buildBreakdowns(session.answers);
     const sortedDomains = [...domainResults].sort((a, b) => a.percent - b.percent);
     const weakestDomain = sortedDomains[0]?.domain || null;
+    const weakestSegment = QuizEngine.weakestSegment(breakdowns);
 
     let bestStreak = 0, curStreak = 0;
     session.answers.forEach(a => {
@@ -2636,7 +2876,7 @@ Views.quiz = {
       else curStreak = 0;
     });
 
-    const result = { date: TODAY(), mode: session.mode, correct, total, percent, domainResults };
+    const result = { date: TODAY(), mode: session.mode, correct, total, percent, domainResults, breakdowns };
     Storage.saveResult(result);
 
     let streakExtended = false;
@@ -2648,10 +2888,10 @@ Views.quiz = {
       StreakManager.markActivityDone();
     }
 
-    SupabaseSync.saveQuizSession({ mode: session.mode, correct, total, percent, domainResults }).catch(console.error);
+    SupabaseSync.saveQuizSession({ mode: session.mode, correct, total, percent, domainResults, breakdowns }).catch(console.error);
     SupabaseSync.pushProgress().catch(console.error);
 
-    AppState.lastSummary = { correct, total, percent, bestStreak, weakestDomain, streakExtended, mode: session.mode };
+    AppState.lastSummary = { correct, total, percent, bestStreak, weakestDomain, weakestSegment, streakExtended, mode: session.mode };
     AppState.quizSession = null;
     App.navigate('summary');
   },
@@ -2779,7 +3019,13 @@ Views.summary = {
             <span>${t('best_streak')}</span>
             <span>${t('in_a_row', { n: s.bestStreak })}</span>
           </div>
-          ${s.weakestDomain ? `
+          ${s.weakestSegment ? `
+          <div class="summary__focus">
+            <span>${t('most_difficulty')}</span>
+            <strong>${labelForSegment(s.weakestSegment.dimension, s.weakestSegment.key)}</strong>
+            <small>${s.weakestSegment.correct} / ${s.weakestSegment.total} (${s.weakestSegment.percent}%)</small>
+            <button class="btn-primary" onclick="Views['mode-select']._applyTraining('${s.weakestSegment.dimension}', '${s.weakestSegment.key}')">${t('train_area')}</button>
+          </div>` : s.weakestDomain ? `
           <div class="summary__detail">
             <span>${t('weakest_domain')}</span>
             <span>${tDomain(s.weakestDomain)}</span>
@@ -2817,12 +3063,15 @@ Views.summary = {
 
 // ==================== STATS VIEW ====================
 Views.stats = {
+  _activeBreakdown: 'ecoDomain',
+
   render() {
     const avg3  = StatsManager.getAvg(3);
     const avg7  = StatsManager.getAvg(7);
     const avg30 = StatsManager.getAvg(30);
     const totals = StatsManager.getTotals();
     const perDomain = StatsManager.getPerDomain(AppState.questions);
+    const breakdown = StatsManager.getBreakdown(this._activeBreakdown, AppState.questions);
     const unlocked = Storage.getUnlockedBadges();
 
     const now = new Date();
@@ -2840,6 +3089,16 @@ Views.stats = {
         </div>
         <span class="domain-bar__pct">${d.percent !== null ? d.percent + '%' : '—'}</span>
       </div>`).join('');
+    const breakdownRows = breakdown.map(item => `
+      <div class="breakdown-row">
+        <span class="breakdown-row__name">${labelForSegment(this._activeBreakdown, item.key)}</span>
+        <div class="domain-bar__track"><div class="domain-bar__fill" style="width:0%" data-target="${item.percent ?? 0}"></div></div>
+        <span class="breakdown-row__pct">${item.percent !== null ? item.percent + '%' : t('no_data')}</span>
+        <span class="breakdown-row__count">${item.total ? item.total + ' ' + t('responses') : ''}</span>
+      </div>`).join('');
+    const breakdownTabs = ['ecoDomain', 'approach', 'domain', 'qtype', 'difficulty'].map(dimension => `
+      <button class="stats-tab ${this._activeBreakdown === dimension ? 'selected' : ''}"
+              onclick="Views.stats._setBreakdown('${dimension}')">${t('tab_' + dimension)}</button>`).join('');
 
     const badgeItems = BADGES_DEF.map(b => `
       <div class="badge-item ${unlocked.includes(b.id) ? '' : 'locked'}" onclick="Views.stats._showBadgeInfo('${b.id}')">
@@ -2889,6 +3148,13 @@ Views.stats = {
           ${domainBars}
         </div>` : ''}
 
+        <div class="stats-card">
+          <h3>${t('preparation_analysis')}</h3>
+          <div class="stats-tabs">${breakdownTabs}</div>
+          <p class="stats-note">${t('data_since_update')}</p>
+          <div class="breakdown-list">${breakdownRows}</div>
+        </div>
+
         <div class="stats-card stats-card--activity" onclick="Views.stats._openFullCalendar()">
           <h3>${t('activity_30')}</h3>
           <div class="activity-header">
@@ -2918,6 +3184,11 @@ Views.stats = {
   _showBadgeInfo(badgeId) {
     const badge = BADGES_DEF.find(b => b.id === badgeId);
     if (badge) showBadgePopup(badge, true);
+  },
+
+  _setBreakdown(dimension) {
+    this._activeBreakdown = dimension;
+    App.render();
   },
 
   _renderMonthGrid(year, month) {
