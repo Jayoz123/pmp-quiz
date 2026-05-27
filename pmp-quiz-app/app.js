@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-13a6b24f';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-f56666c9';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -20,6 +20,21 @@ const QUIZ_SIZES   = { daily: 30, quick: 10, weak: 10 };
 const SRS_COOLDOWN = 15; // min questions before re-showing the same weak question
 const GOOGLE_OAUTH_VISIBLE = false; // Keep the Google beta flow dormant until invites are managed automatically.
 const TODAY = () => new Date().toISOString().slice(0, 10);
+const BRAND_NAME = 'PM Academy';
+const Icons = {
+  mark: () => '<img class="brand-mark" src="./icons/pm-academy-mark.svg" alt="">',
+  training: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 21V4M5 11l7-7 7 7"/></svg>',
+  exam: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 8h4M10 12h4M10 16h4"/></svg>',
+  stats: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 20V11m7 9V4m7 16V8"/></svg>',
+  status: checked => checked
+    ? '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>'
+    : '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg>',
+  settings: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4z"/><path d="M19 12l2-1.2-2-3.4-2.2 1a7 7 0 0 0-1.5-.9L15 5h-4l-.3 2.5a7 7 0 0 0-1.5.9L7 7.4l-2 3.4L7 12l-2 1.2 2 3.4 2.2-1a7 7 0 0 0 1.5.9L11 19h4l.3-2.5a7 7 0 0 0 1.5-.9l2.2 1 2-3.4z"/></svg>',
+  confidence: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20a8 8 0 1 0-8-8"/><path d="M12 8v4l3 2"/></svg>',
+  scroll: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4v16m-5-5 5 5 5-5"/></svg>',
+  language: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>',
+  theme: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 15.5A8.5 8.5 0 1 1 8.5 4 7 7 0 0 0 20 15.5z"/></svg>',
+};
 
 // ==================== TRIAL EXAM (plan 12) ====================
 // Prawdziwy egzamin PMP: 230 min / 180 pyt ≈ 1.2778 min/pyt — skalujemy proporcjonalnie.
@@ -188,6 +203,9 @@ const I18N = {
   statistics:         { pl: 'Statystyki',                       en: 'Statistics' },
   your_progress:      { pl: 'Twój postęp',                      en: 'Your progress' },
   // settings modal
+  settings_learning:  { pl: 'Nauka',                            en: 'Learning' },
+  settings_display:   { pl: 'Wygląd i język',                   en: 'Appearance and language' },
+  settings_account:   { pl: 'Konto',                            en: 'Account' },
   close:              { pl: 'Zamknij',                          en: 'Close' },
   confidence_label:   { pl: 'Ocena pewności',                   en: 'Confidence rating' },
   confidence_desc:    { pl: 'Skala 1–3 przed odpowiedzią',      en: '1–3 scale before answering' },
@@ -1348,14 +1366,14 @@ const ThemeManager = {
 
     if (theme === 'dark') {
       root.classList.add('theme-dark');
-      if (metaTheme) metaTheme.setAttribute('content', '#0f172a');
+      if (metaTheme) metaTheme.setAttribute('content', '#081426');
     } else if (theme === 'light') {
       root.classList.add('theme-light');
-      if (metaTheme) metaTheme.setAttribute('content', '#6366f1');
+      if (metaTheme) metaTheme.setAttribute('content', '#F5F7FB');
     } else {
       // auto
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (metaTheme) metaTheme.setAttribute('content', isDark ? '#0f172a' : '#6366f1');
+      if (metaTheme) metaTheme.setAttribute('content', isDark ? '#081426' : '#F5F7FB');
     }
   }
 };
@@ -1526,8 +1544,8 @@ Views.login = {
     if (isReset) {
       return `
       <div class="screen login-screen">
-        <div class="login-logo">📋</div>
-        <h1 class="login-title">PMP Quiz</h1>
+        <div class="login-logo">${Icons.mark()}</div>
+        <h1 class="login-title">${BRAND_NAME}</h1>
         <p class="login-subtitle">${subtitle}</p>
         ${kickedBanner}
         <div class="login-form">
@@ -1556,8 +1574,8 @@ Views.login = {
     // ── Login / Register form ──
     return `
       <div class="screen login-screen">
-        <div class="login-logo">📋</div>
-        <h1 class="login-title">PMP Quiz</h1>
+        <div class="login-logo">${Icons.mark()}</div>
+        <h1 class="login-title">${BRAND_NAME}</h1>
         <p class="login-subtitle">${subtitle}</p>
         ${kickedBanner}
         <div class="login-form">
@@ -1739,8 +1757,8 @@ Views.loading = {
     const quote = q[L()] ?? q.pl;
     return `
       <div class="loading-screen">
-        <div class="loading-logo">📋</div>
-        <h1>PMP Quiz</h1>
+        <div class="loading-logo">${Icons.mark()}</div>
+        <h1>${BRAND_NAME}</h1>
         <p class="loading-quote">"${quote}"</p>
         <div class="loading-spinner"></div>
       </div>`;
@@ -1784,7 +1802,7 @@ Views.home = {
     return `
       <div class="screen home">
         <div class="home-topbar">
-          <button class="btn-settings" onclick="Views.home._openSettings()" title="${t('settings')}">⚙️</button>
+          <button class="btn-settings" onclick="Views.home._openSettings()" title="${t('settings')}" aria-label="${t('settings')}">${Icons.settings()}</button>
         </div>
         ${syncLabel ? `<div class="sync-indicator sync-indicator--${AppState.syncStatus}">${syncLabel}</div>` : ''}
         <div id="pwa-install-banner"></div>
@@ -1798,7 +1816,7 @@ Views.home = {
           <div class="streak-message">${streakLabel}</div>
           <button class="menu-btn menu-btn--daily ${dailyDone ? 'done' : 'pending'}"
                   ${dailyDone ? 'disabled aria-disabled="true"' : `onclick="App.navigate('daily-start')"`}>
-            <span class="menu-btn__icon">${dailyDone ? '✅' : '🔴'}</span>
+            <span class="menu-btn__icon">${Icons.status(dailyDone)}</span>
             <div class="menu-btn__content">
               <div class="menu-btn__title">${t('daily_challenge')}</div>
               <div class="menu-btn__sub">${dailyDone ? t('daily_done') : t('daily_pending')}</div>
@@ -1815,7 +1833,7 @@ Views.home = {
             <button class="btn-primary" onclick="Views['mode-select']._applyTraining('${recommended.dimension}', '${recommended.key}')">${t('practice_10')}</button>
           </div>` : ''}
           <button class="menu-btn" onclick="App.navigate('mode-select')">
-            <span class="menu-btn__icon">⚡</span>
+            <span class="menu-btn__icon">${Icons.training()}</span>
             <div class="menu-btn__content">
               <div class="menu-btn__title">${t('quick_quiz')}</div>
               <div class="menu-btn__sub">${t('quick_quiz_sub')}</div>
@@ -1823,7 +1841,7 @@ Views.home = {
             <span class="menu-btn__arrow">›</span>
           </button>
           <button class="menu-btn" onclick="App.navigate('trial-setup')">
-            <span class="menu-btn__icon">📝</span>
+            <span class="menu-btn__icon">${Icons.exam()}</span>
             <div class="menu-btn__content">
               <div class="menu-btn__title">${t('trial_title')}</div>
               <div class="menu-btn__sub">${t('trial_menu_sub')}</div>
@@ -1831,7 +1849,7 @@ Views.home = {
             <span class="menu-btn__arrow">›</span>
           </button>
           <button class="menu-btn" onclick="App.navigate('stats')">
-            <span class="menu-btn__icon">📊</span>
+            <span class="menu-btn__icon">${Icons.stats()}</span>
             <div class="menu-btn__content">
               <div class="menu-btn__title">${t('statistics')}</div>
               <div class="menu-btn__sub">${t('your_progress')}</div>
@@ -1854,9 +1872,11 @@ Views.home = {
           <span>${t('settings')}</span>
           <button class="settings-modal__close" onclick="Views.home._closeSettings()" aria-label="${t('close')}">✕</button>
         </div>
+        <section class="settings-group">
+          <h3 class="settings-group__title">${t('settings_learning')}</h3>
         <div class="settings-row">
           <div class="settings-row__info">
-            <span class="settings-row__icon">🧠</span>
+            <span class="settings-row__icon">${Icons.confidence()}</span>
             <div>
               <div class="settings-row__label">${t('confidence_label')}</div>
               <div class="settings-row__desc">${t('confidence_desc')}</div>
@@ -1869,10 +1889,9 @@ Views.home = {
             <span class="settings-toggle__slider"></span>
           </label>
         </div>
-        <div class="settings-separator"></div>
         <div class="settings-row">
           <div class="settings-row__info">
-            <span class="settings-row__icon">📜</span>
+            <span class="settings-row__icon">${Icons.scroll()}</span>
             <div>
               <div class="settings-row__label">${t('auto_scroll_label')}</div>
               <div class="settings-row__desc">${t('auto_scroll_desc')}</div>
@@ -1885,10 +1904,12 @@ Views.home = {
             <span class="settings-toggle__slider"></span>
           </label>
         </div>
-        <div class="settings-separator"></div>
+        </section>
+        <section class="settings-group">
+          <h3 class="settings-group__title">${t('settings_display')}</h3>
         <div class="settings-row">
           <div class="settings-row__info">
-            <span class="settings-row__icon">🌐</span>
+            <span class="settings-row__icon">${Icons.language()}</span>
             <div>
               <div class="settings-row__label">${t('app_language')}</div>
               <div class="settings-row__desc">${t('app_language_desc')}</div>
@@ -1901,10 +1922,9 @@ Views.home = {
                     onclick="Views.home._setLang('en')">EN</button>
           </div>
         </div>
-        <div class="settings-separator"></div>
         <div class="settings-row">
           <div class="settings-row__info">
-            <span class="settings-row__icon">🌓</span>
+            <span class="settings-row__icon">${Icons.theme()}</span>
             <div>
               <div class="settings-row__label">${t('theme')}</div>
               <div class="settings-row__desc">${t('theme_desc')}</div>
@@ -1919,11 +1939,14 @@ Views.home = {
                     onclick="Views.home._setTheme('dark')">${t('theme_dark')}</button>
           </div>
         </div>
-        <div class="settings-separator"></div>
+        </section>
+        <section class="settings-group">
+          <h3 class="settings-group__title">${t('settings_account')}</h3>
         <button class="settings-action-btn settings-action-btn--danger"
-                onclick="Views.home._logout()">${t('sign_out')}</button>
+                 onclick="Views.home._logout()">${t('sign_out')}</button>
         <a class="settings-action-btn settings-action-btn--link"
            href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
+        </section>
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) Views.home._closeSettings(); });

@@ -3,37 +3,26 @@
 Generuje ikony PNG dla PWA (192x192 i 512x512).
 Użycie: python tools/generate_icons.py
 """
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import os
 
+BG = '#4F46E5'
+MARK = '#FFFFFF'
+
+def draw_mark(draw, size):
+    s = size / 64
+    width = max(2, int(6 * s))
+    p_path = [(12*s, 52*s), (12*s, 12*s), (27*s, 12*s), (34*s, 13*s),
+              (39*s, 18*s), (40*s, 25*s), (39*s, 30*s), (37*s, 34*s)]
+    m_path = [(22*s, 52*s), (22*s, 39*s), (32*s, 29*s),
+              (42*s, 39*s), (54*s, 27*s), (54*s, 52*s)]
+    draw.line(p_path, fill=MARK, width=width, joint='curve')
+    draw.line(m_path, fill=MARK, width=width, joint='curve')
+
 def create_icon(size, output_path):
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    img = Image.new('RGBA', (size, size), BG)
     draw = ImageDraw.Draw(img)
-
-    # Background circle
-    margin = int(size * 0.05)
-    draw.ellipse([margin, margin, size - margin, size - margin],
-                 fill='#6366f1')
-
-    # Inner circle (subtle)
-    inner_m = int(size * 0.12)
-    draw.ellipse([inner_m, inner_m, size - inner_m, size - inner_m],
-                 fill='#5254cc')
-
-    # Text "PM"
-    try:
-        font_size = int(size * 0.32)
-        font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', font_size)
-    except Exception:
-        font = ImageFont.load_default()
-
-    text = 'PM'
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    x = (size - text_w) // 2 - bbox[0]
-    y = (size - text_h) // 2 - bbox[1]
-    draw.text((x, y), text, fill='white', font=font)
+    draw_mark(draw, size)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     img.save(output_path, 'PNG')

@@ -1,12 +1,12 @@
 {
-  "name": "PMP Quiz",
-  "short_name": "PMP Quiz",
-  "description": "Aplikacja do nauki na egzamin PMP",
+  "name": "PM Academy",
+  "short_name": "PM Academy",
+  "description": "Profesjonalne przygotowanie do egzaminu PMP",
   "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#6366f1",
-  "theme_color": "#6366f1",
+  "background_color": "#F5F7FB",
+  "theme_color": "#4F46E5",
   "icons": [
     {
       "src": "icons/icon-192.png",
