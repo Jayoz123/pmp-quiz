@@ -78,10 +78,8 @@ const tDifficulty = key => key;
 const questionTagItems = (question, detailed = false) => {
   const tags = [
     question.domain && { kind: 'domain', text: tDomain(question.domain), className: 'quiz-tag--domain' },
-    question.eco_domain && { kind: 'eco', text: tEcoDomain(question.eco_domain), className: 'quiz-tag--eco' },
     ...(question.approach_tags || []).map(tag => ({ kind: 'approach', text: tApproach(tag), className: 'quiz-tag--approach' })),
   ].filter(Boolean);
-  if (detailed && question.qtype) tags.push({ kind: 'qtype', text: tQtype(question.qtype), className: 'quiz-tag--detail' });
   if (detailed && question.difficulty) tags.push({ kind: 'difficulty', text: tDifficulty(question.difficulty), className: 'quiz-tag--detail' });
   return tags;
 };
@@ -1052,8 +1050,8 @@ test('questionTagItems includes qtype and difficulty only in detail mode', () =>
     qtype: 'knowledge',
     difficulty: 'hard',
   };
-  assertEqual(questionTagItems(q, false).map(item => item.kind), ['domain', 'eco', 'approach']);
-  assertEqual(questionTagItems(q, true).map(item => item.kind), ['domain', 'eco', 'approach', 'qtype', 'difficulty']);
+  assertEqual(questionTagItems(q, false).map(item => item.kind), ['domain', 'approach']);
+  assertEqual(questionTagItems(q, true).map(item => item.kind), ['domain', 'approach', 'difficulty']);
 });
 
 console.log('\nApp problem reports:');

@@ -595,6 +595,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 }
 .menu-btn:active { transform: scale(0.98); }
 .menu-btn__icon { color: var(--accent); display: inline-flex; flex-shrink: 0; }
+.menu-btn__icon .ui-icon { width: 26px; height: 26px; }
 .menu-btn__content { flex: 1; }
 .menu-btn__title { font-size: 1rem; font-weight: 600; }
 .menu-btn__sub { font-size: 0.82rem; color: var(--text2); margin-top: 2px; }
@@ -666,6 +667,12 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   font-weight: 600;
 }
 .filters-advanced { margin-top: 14px; padding-top: 4px; border-top: 1px solid var(--border); }
+.filters-hint {
+  color: var(--text2);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin-top: 10px;
+}
 .filter-section { margin-top: 12px; }
 .filter-section label, .question-count label {
   font-size: 0.82rem;
@@ -798,7 +805,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   max-width: 100%;
   min-width: 0;
 }
-.quiz-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.quiz-tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .quiz-tag {
   font-size: 0.72rem;
   font-weight: 600;
@@ -814,29 +821,22 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .quiz-tags--feedback { margin: 10px 0 4px; }
 .quiz-meta-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-.quiz-meta-main {
-  display: flex;
   flex-direction: column;
   gap: 7px;
   min-width: 0;
 }
+.quiz-tags-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
 .quiz-exp-chip {
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 4px 10px;
-  border-radius: 999px;
   background: var(--green-light);
   color: var(--green);
-  font-size: 0.78rem;
-  font-weight: 800;
   white-space: nowrap;
-  box-shadow: var(--shadow);
 }
 .btn-lang-toggle {
   width: 34px;
@@ -950,7 +950,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   min-width: 0;
 }
 .explanation-title__icon {
-  width: 34px;
+  width: 38px;
   height: 34px;
   display: inline-grid;
   place-items: center;
@@ -959,11 +959,11 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   color: var(--accent);
   flex-shrink: 0;
 }
-.explanation-title__icon .ui-icon { width: 19px; height: 19px; }
+.explanation-title__icon .ui-icon { width: 23px; height: 21px; stroke-width: 1.9; }
 .explanation-verdict {
   display: inline-flex;
   align-items: center;
-  margin: 2px 0 8px;
+  margin: 0 0 10px;
   padding: 4px 9px;
   border-radius: 999px;
   font-size: .74rem;

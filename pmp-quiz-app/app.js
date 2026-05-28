@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-41961d9c';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-7b82d980';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -53,7 +53,7 @@ const BRAND_NAME = 'PM Academy';
 const Icons = {
   mark: () => '<img class="brand-mark" src="./icons/pm-academy-mark.svg" alt="">',
   training: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 21V4M5 11l7-7 7 7"/></svg>',
-  exam: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M7 3h10v18H7zM10 8h4M10 12h4M10 16h4"/></svg>',
+  exam: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h6"/></svg>',
   stats: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 20V11m7 9V4m7 16V8"/></svg>',
   status: checked => checked
     ? '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>'
@@ -70,7 +70,7 @@ const Icons = {
   shield: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 20 7v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/><path d="M9 12l2 2 4-5"/></svg>',
   streak: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.8 7-6.7 0-2.8-1.7-5.3-4.8-7.8.1 2.1-.8 3.7-2.2 4.7.2-3.1-1.2-5.6-4-7.2.4 3.5-3 5.5-3 10.2C5 19.2 8 22 12 22z"/><path d="M12 18c1.4 0 2.4-1 2.4-2.3 0-1-.6-1.8-1.7-2.7 0 1-.4 1.6-1 2.1 0-1.4-.6-2.5-1.8-3.2.2 1.6-1.2 2.4-1.2 4C8.7 17.1 10 18 12 18z"/></svg>',
   flag: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h12l-1.5 4L17 12H5"/></svg>',
-  bookOpen: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M4 5.5A3 3 0 0 1 7 4h5v17H7a3 3 0 0 0-3 3z"/><path d="M20 5.5A3 3 0 0 0 17 4h-5v17h5a3 3 0 0 1 3 3z"/></svg>',
+  bookOpen: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1 1-1h5a3 3 0 0 1 3 3V7a3 3 0 0 0-3-3H4a1 1 0 0 0-1 1z"/><path d="M21 18a1 1 0 0 0-1-1h-5a3 3 0 0 0-3 3V7a3 3 0 0 1 3-3h5a1 1 0 0 1 1 1z"/></svg>',
   translate: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h9"/><path d="M9 3v2"/><path d="M5 9c1.4 3 3.7 5.4 7 7"/><path d="M12 9c-.8 2-2.3 4-4.8 6"/><path d="M15 19l3-7 3 7"/><path d="M16.2 16.5h3.6"/></svg>',
   trendUp: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17l6-6 4 4 6-8"/><path d="M15 7h5v5"/></svg>',
   list: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>',
@@ -225,10 +225,8 @@ const labelForSegment = (dimension, key) => ({
 const questionTagItems = (question, detailed = false) => {
   const tags = [
     question.domain && { kind: 'domain', text: tDomain(question.domain), className: 'quiz-tag--domain' },
-    question.eco_domain && { kind: 'eco', text: tEcoDomain(question.eco_domain), className: 'quiz-tag--eco' },
     ...(question.approach_tags || []).map(tag => ({ kind: 'approach', text: tApproach(tag), className: 'quiz-tag--approach' })),
   ].filter(Boolean);
-  if (detailed && question.qtype) tags.push({ kind: 'qtype', text: tQtype(question.qtype), className: 'quiz-tag--detail' });
   if (detailed && question.difficulty) tags.push({ kind: 'difficulty', text: tDifficulty(question.difficulty), className: 'quiz-tag--detail' });
   return tags;
 };
@@ -370,7 +368,8 @@ const I18N = {
   back:               { pl: '‹ Wróć',                           en: '‹ Back' },
   standard_quiz:      { pl: '⚡ Standardowy Quiz',              en: '⚡ Standard Quiz' },
   standard_quiz_desc: { pl: 'Wybierz trening',                  en: 'Choose training' },
-  filter_domains:     { pl: 'Filtruj domeny (domyślnie wszystkie):', en: 'Filter domains (all by default):' },
+  filter_domains:     { pl: 'Domains',                           en: 'Domains' },
+  filter_empty_hint:   { pl: 'Jeśli nie zaznaczysz opcji w danej sekcji, brane są pod uwagę wszystkie opcje z tej sekcji.', en: 'Leaving a section empty includes all options from that section.' },
   filter_eco:         { pl: 'Domena egzaminu ECO',              en: 'ECO exam domain' },
   filter_approach:    { pl: 'Podejście',                        en: 'Approach' },
   filter_qtype:       { pl: 'Typ pytań',                        en: 'Question type' },
@@ -2737,6 +2736,7 @@ Views['mode-select'] = {
           <button class="filters-toggle" onclick="Views['mode-select']._toggleAdvanced()">${t('customize_scope')} ${this._advanced ? '▲' : '▼'}</button>
           ${this._advanced ? `
           <div class="filters-advanced">
+            <p class="filters-hint">${t('filter_empty_hint')}</p>
             <div class="filter-section"><label>${t('filter_eco')}</label><div class="domain-chips">${renderChips('ecoDomains', Object.keys(ECO_I18N), tEcoDomain)}</div></div>
             <div class="filter-section"><label>${t('filter_approach')}</label><div class="domain-chips">${renderChips('approachTags', Object.keys(APPROACH_I18N), tApproach)}</div></div>
             <div class="filter-section"><label>${t('filter_domains')}</label><div class="domain-chips">${renderChips('domains', domains, tDomain)}</div></div>
@@ -3387,11 +3387,11 @@ Views.quiz = {
           <div class="quiz-progress__bar" style="width:${pct}%"></div>
         </div>
         <div class="quiz-meta-row">
-          <div class="quiz-meta-main">
-            <span class="quiz-context">${sessionLabel}</span>
+          <span class="quiz-context">${sessionLabel}</span>
+          <div class="quiz-tags-row">
             <div class="quiz-tags">${quizTagsHtml(q, true)}</div>
+            <span class="quiz-tag quiz-exp-chip" id="quiz-exp-chip">+${expPreview} EXP</span>
           </div>
-          <span class="quiz-exp-chip" id="quiz-exp-chip">+${expPreview} EXP</span>
         </div>
         <div class="quiz-question">${questionText}</div>
         <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
@@ -3558,6 +3558,7 @@ Views.quiz = {
 
     panel.innerHTML = `
       <div class="feedback-card ${isCorrect ? 'feedback-card--correct' : 'feedback-card--wrong'}">
+        <span class="explanation-verdict ${isCorrect ? 'explanation-verdict--correct' : 'explanation-verdict--wrong'}">${isCorrect ? t('verdict_correct') : t('verdict_wrong')}</span>
         <div class="explanation-header">
           <div class="explanation-title">
             <span class="explanation-title__icon">${Icons.bookOpen()}</span>
@@ -3565,7 +3566,6 @@ Views.quiz = {
           </div>
           ${explanationLangBtn}
         </div>
-        <span class="explanation-verdict ${isCorrect ? 'explanation-verdict--correct' : 'explanation-verdict--wrong'}">${isCorrect ? t('verdict_correct') : t('verdict_wrong')}</span>
         <p class="explanation-text" id="expl-text">${explanationText}</p>
         <div class="feedback-impact">
           <span>${Icons.trendUp()}</span>
