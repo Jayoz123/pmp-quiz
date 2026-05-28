@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-864f1863';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-41961d9c';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -21,9 +21,10 @@ const SRS_COOLDOWN = 15; // min questions before re-showing the same weak questi
 const GOOGLE_OAUTH_VISIBLE = false; // Keep the Google beta flow dormant until invites are managed automatically.
 const TODAY = () => new Date().toISOString().slice(0, 10);
 const Engagement = {
+  questionExp(wasCorrect) { return wasCorrect ? 5 : 1; },
   scoreAnswers({ correct, total, mode }) {
     const wrong = total - correct;
-    let careerExp = correct * 5 + wrong;
+    let careerExp = correct * this.questionExp(true) + wrong * this.questionExp(false);
     let rankingDelta = correct * 2 - wrong * 2;
     if (mode === 'daily') careerExp += 20;
     if (mode === 'daily' && correct / total >= 0.7) rankingDelta += 5;
@@ -41,6 +42,13 @@ const Engagement = {
   levelForExp(exp) { return Math.floor(Math.sqrt(Math.max(0, exp) / 100)) + 1; },
 };
 const newSessionId = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+function formatDurationHms(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hh = String(Math.floor(safeSeconds / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((safeSeconds % 3600) / 60)).padStart(2, '0');
+  const ss = String(safeSeconds % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
 const BRAND_NAME = 'PM Academy';
 const Icons = {
   mark: () => '<img class="brand-mark" src="./icons/pm-academy-mark.svg" alt="">',
@@ -61,6 +69,46 @@ const Icons = {
   calendar: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 2v4M16 2v4"/><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>',
   shield: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 20 7v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/><path d="M9 12l2 2 4-5"/></svg>',
   streak: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.8 7-6.7 0-2.8-1.7-5.3-4.8-7.8.1 2.1-.8 3.7-2.2 4.7.2-3.1-1.2-5.6-4-7.2.4 3.5-3 5.5-3 10.2C5 19.2 8 22 12 22z"/><path d="M12 18c1.4 0 2.4-1 2.4-2.3 0-1-.6-1.8-1.7-2.7 0 1-.4 1.6-1 2.1 0-1.4-.6-2.5-1.8-3.2.2 1.6-1.2 2.4-1.2 4C8.7 17.1 10 18 12 18z"/></svg>',
+  flag: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h12l-1.5 4L17 12H5"/></svg>',
+  bookOpen: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M4 5.5A3 3 0 0 1 7 4h5v17H7a3 3 0 0 0-3 3z"/><path d="M20 5.5A3 3 0 0 0 17 4h-5v17h5a3 3 0 0 1 3 3z"/></svg>',
+  translate: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h9"/><path d="M9 3v2"/><path d="M5 9c1.4 3 3.7 5.4 7 7"/><path d="M12 9c-.8 2-2.3 4-4.8 6"/><path d="M15 19l3-7 3 7"/><path d="M16.2 16.5h3.6"/></svg>',
+  trendUp: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17l6-6 4 4 6-8"/><path d="M15 7h5v5"/></svg>',
+  list: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+  xCircle: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>',
+  helpCircle: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.8 2.8 0 1 1 4.8 2c-.9.8-1.8 1.3-1.8 2.7"/><path d="M12 17h.01"/></svg>',
+  pencil: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/></svg>',
+  globe: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>',
+  messageCircle: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.8 7.4L3 20l1.2-5A8.5 8.5 0 1 1 21 11.5z"/></svg>',
+  bug: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M8 8h8v9a4 4 0 0 1-8 0V8z"/><path d="M9 4l2 2M15 4l-2 2M3 13h5M16 13h5M4 19l4-2M16 17l4 2M4 7l4 2M16 9l4-2"/></svg>',
+  palette: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.5a2 2 0 0 0 1.4-3.4 1.7 1.7 0 0 1 1.2-2.9H18a3 3 0 0 0 3-3A8.7 8.7 0 0 0 12 3z"/><circle cx="7.5" cy="11" r=".5"/><circle cx="10" cy="7.5" r=".5"/><circle cx="14" cy="7.5" r=".5"/></svg>',
+  sync: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-13.5-5.8L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 13.5 5.8L20 16"/><path d="M20 20v-4h-4"/></svg>',
+  login: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h4a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3h-4"/></svg>',
+};
+const AppProblemReport = {
+  sanitizeHash(hash) {
+    return String(hash || '').startsWith('#/') ? hash : null;
+  },
+  sanitizeHref(href) {
+    try {
+      const url = new URL(href);
+      return `${url.origin}${url.pathname}`;
+    } catch {
+      return null;
+    }
+  },
+  buildPayload({ userId, category, comment, appVersion, userAgent, pageHref, pageHash, settings = {} }) {
+    return {
+      user_id: userId,
+      category,
+      comment: comment || null,
+      app_version: appVersion || null,
+      user_agent: userAgent || null,
+      page_href: this.sanitizeHref(pageHref),
+      page_hash: this.sanitizeHash(pageHash),
+      app_language: settings.defaultLanguage || null,
+      app_theme: settings.theme || null,
+    };
+  },
 };
 const appNav = active => `
   <nav class="app-nav" aria-label="${t('nav_label')}">
@@ -174,15 +222,20 @@ const filterForSegment = (dimension, key) => {
 const labelForSegment = (dimension, key) => ({
   domain: tDomain, ecoDomain: tEcoDomain, approach: tApproach, difficulty: tDifficulty, qtype: tQtype,
 }[dimension] || (v => v))(key);
-const quizTagsHtml = (question, extended = false) => {
+const questionTagItems = (question, detailed = false) => {
   const tags = [
-    question.domain && { text: tDomain(question.domain), className: 'quiz-tag--domain' },
-    question.eco_domain && { text: tEcoDomain(question.eco_domain), className: 'quiz-tag--eco' },
-    ...(question.approach_tags || []).map(tag => ({ text: tApproach(tag), className: 'quiz-tag--approach' })),
+    question.domain && { kind: 'domain', text: tDomain(question.domain), className: 'quiz-tag--domain' },
+    question.eco_domain && { kind: 'eco', text: tEcoDomain(question.eco_domain), className: 'quiz-tag--eco' },
+    ...(question.approach_tags || []).map(tag => ({ kind: 'approach', text: tApproach(tag), className: 'quiz-tag--approach' })),
   ].filter(Boolean);
-  if (extended && question.qtype) tags.push({ text: tQtype(question.qtype), className: 'quiz-tag--detail' });
-  if (extended && question.difficulty) tags.push({ text: tDifficulty(question.difficulty), className: 'quiz-tag--detail' });
-  return tags.map(tag => `<span class="quiz-tag ${tag.className}">${tag.text}</span>`).join('');
+  if (detailed && question.qtype) tags.push({ kind: 'qtype', text: tQtype(question.qtype), className: 'quiz-tag--detail' });
+  if (detailed && question.difficulty) tags.push({ kind: 'difficulty', text: tDifficulty(question.difficulty), className: 'quiz-tag--detail' });
+  return tags;
+};
+const quizTagsHtml = (question, extended = false) => {
+  return questionTagItems(question, extended)
+    .map(tag => `<span class="quiz-tag ${tag.className}">${tag.text}</span>`)
+    .join('');
 };
 
 const I18N = {
@@ -290,6 +343,7 @@ const I18N = {
   settings_display:   { pl: 'Wygląd i język',                   en: 'Appearance and language' },
   settings_privacy:   { pl: 'Ranking i prywatność',             en: 'Ranking and privacy' },
   settings_account:   { pl: 'Konto',                            en: 'Account' },
+  settings_support:   { pl: 'Pomoc',                            en: 'Support' },
   close:              { pl: 'Zamknij',                          en: 'Close' },
   confidence_label:   { pl: 'Ocena pewności',                   en: 'Confidence rating' },
   confidence_desc:    { pl: 'Skala 1–3 przed odpowiedzią',      en: '1–3 scale before answering' },
@@ -310,6 +364,8 @@ const I18N = {
   leaderboard_desc:   { pl: 'Widoczny będzie tylko Twój nick, pozycja i wynik/EXP.', en: 'Only your nick, position and score/EXP will be visible.' },
   leaderboard_error:  { pl: 'Nie udało się zapisać ustawienia rankingu.', en: 'Could not save leaderboard setting.' },
   sign_out_confirm:   { pl: 'Wylogować się?',                   en: 'Sign out?' },
+  report_app_problem: { pl: 'Zgłoś problem z aplikacją',         en: 'Report an app problem' },
+  report_app_desc:    { pl: 'Zgłoś błąd działania, wyglądu, logowania albo synchronizacji.', en: 'Report behavior, visual, login, or sync issues.' },
   // mode select
   back:               { pl: '‹ Wróć',                           en: '‹ Back' },
   standard_quiz:      { pl: '⚡ Standardowy Quiz',              en: '⚡ Standard Quiz' },
@@ -344,19 +400,31 @@ const I18N = {
   verdict_wrong:      { pl: '❌ Błędna odpowiedź',              en: '❌ Wrong answer' },
   why_answer:         { pl: 'Dlaczego ta odpowiedź?',           en: 'Why this answer?' },
   session_daily:      { pl: 'Codzienne wyzwanie',               en: 'Daily challenge' },
+  why_answer_good:    { pl: 'Dlaczego to dobra odpowiedź',       en: 'Why this is the right answer' },
+  translate_question: { pl: 'Przetłumacz pytanie',              en: 'Translate question' },
+  readiness_question_delta:{ pl: 'Gotowość {n}',                en: 'Readiness {n}' },
+  readiness_question_calibrating:{ pl: 'Gotowość: kalibracja',  en: 'Readiness: calibrating' },
   session_adaptive:   { pl: 'Trening adaptacyjny',              en: 'Adaptive training' },
   session_weak:       { pl: 'Powtórka słabych pytań',           en: 'Weak question review' },
   session_quick:      { pl: 'Trening',                          en: 'Training' },
   next:               { pl: 'Dalej →',                          en: 'Next →' },
   // report modal
   report_aria:        { pl: 'Zgłoś błąd',                       en: 'Report an issue' },
-  report_header:      { pl: '🚩 Zgłoś błąd w pytaniu',          en: '🚩 Report an issue with this question' },
-  cat_wrong_answer:   { pl: '❌ Błędna poprawna odpowiedź',     en: '❌ Wrong correct answer' },
-  cat_unclear:        { pl: '❓ Niejasne pytanie',              en: '❓ Unclear question' },
-  cat_typo:           { pl: '✏️ Literówka / błąd w treści',     en: '✏️ Typo / error in text' },
-  cat_translation:    { pl: '🌐 Błąd w tłumaczeniu (EN/PL)',    en: '🌐 Translation error (EN/PL)' },
-  cat_other:          { pl: '💬 Inne',                          en: '💬 Other' },
+  report_header:      { pl: 'Zgłoś błąd w pytaniu',             en: 'Report an issue with this question' },
+  app_report_aria:    { pl: 'Zgłoś problem z aplikacją',         en: 'Report an app problem' },
+  app_report_header:  { pl: 'Zgłoś problem z aplikacją',         en: 'Report an app problem' },
+  cat_wrong_answer:   { pl: 'Błędna poprawna odpowiedź',         en: 'Wrong correct answer' },
+  cat_unclear:        { pl: 'Niejasne pytanie',                  en: 'Unclear question' },
+  cat_typo:           { pl: 'Literówka / błąd w treści',         en: 'Typo / error in text' },
+  cat_translation:    { pl: 'Błąd w tłumaczeniu (EN/PL)',        en: 'Translation error (EN/PL)' },
+  cat_app_bug:        { pl: 'Błąd działania',                    en: 'App behavior bug' },
+  cat_app_ui:         { pl: 'Problem z wyglądem',                en: 'Visual issue' },
+  cat_app_sync:       { pl: 'Synchronizacja / postęp',           en: 'Sync / progress' },
+  cat_app_login:      { pl: 'Logowanie / konto',                 en: 'Login / account' },
+  cat_app_content:    { pl: 'Treść poza pytaniem',               en: 'Content outside a question' },
+  cat_other:          { pl: 'Inne',                              en: 'Other' },
   report_comment_ph:  { pl: 'Opcjonalnie: opisz dokładniej co jest nie tak…', en: 'Optionally: describe in more detail what is wrong…' },
+  app_report_comment_ph:{ pl: 'Opisz, gdzie wystąpił problem i co próbowałaś/eś zrobić…', en: 'Describe where it happened and what you were trying to do…' },
   cancel:             { pl: 'Anuluj',                           en: 'Cancel' },
   send_report:        { pl: 'Wyślij zgłoszenie',               en: 'Send report' },
   report_sent:        { pl: '✅ Zgłoszenie wysłane — dziękujemy!', en: '✅ Report sent — thank you!' },
@@ -443,6 +511,13 @@ const I18N = {
   trial_finish:           { pl: 'Zakończ egzamin',                  en: 'Finish exam' },
   trial_flag:             { pl: 'Oznacz do przeglądu',              en: 'Flag for review' },
   trial_palette:          { pl: 'Pytania',                          en: 'Questions' },
+  trial_flag_on:          { pl: 'Oflagowane',                       en: 'Flagged' },
+  trial_list:             { pl: 'Lista',                            en: 'List' },
+  trial_palette_title:    { pl: 'Lista pytań',                      en: 'Question list' },
+  trial_answered:         { pl: 'Odpowiedziane',                    en: 'Answered' },
+  trial_unanswered:       { pl: 'Bez odpowiedzi',                   en: 'Unanswered' },
+  trial_flagged:          { pl: 'Oflagowane',                       en: 'Flagged' },
+  trial_question_label:   { pl: 'Pytanie',                          en: 'Question' },
   trial_abandon:          { pl: 'Przerwij egzamin',                 en: 'Abandon exam' },
   trial_abandon_confirm:  { pl: 'Przerwać egzamin? Postęp przepadnie.', en: 'Abandon the exam? Progress will be lost.' },
   trial_confirm:          { pl: 'Zakończyć? Bez odpowiedzi: {un}, oflagowane: {fl}.', en: 'Finish? Unanswered: {un}, flagged: {fl}.' },
@@ -694,6 +769,28 @@ const SupabaseSync = {
       if (error) throw error;
     } catch (e) {
       console.warn('reportQuestion failed:', e);
+      throw e;
+    }
+  },
+
+  async reportAppProblem({ category, comment }) {
+    try {
+      const { data: { user } } = await sb().auth.getUser();
+      if (!user) throw new Error('Nie jesteś zalogowany');
+      const row = AppProblemReport.buildPayload({
+        userId: user.id,
+        category,
+        comment,
+        appVersion: APP_VERSION,
+        userAgent: navigator.userAgent,
+        pageHref: location.href,
+        pageHash: location.hash,
+        settings: Storage.getSettings(),
+      });
+      const { error } = await sb().from('app_problem_reports').insert(row);
+      if (error) throw error;
+    } catch (e) {
+      console.warn('reportAppProblem failed:', e);
       throw e;
     }
   },
@@ -1402,8 +1499,20 @@ const StatsManager = {
       key, ...item, percent: Math.round(item.correct / item.total * 100),
     }));
   },
-  getReadiness() {
-    const recent = this.getRecentClassifiedHistory();
+  resultFromAnswerRecords(answerRecords) {
+    const records = Array.isArray(answerRecords) ? answerRecords : [];
+    const correct = records.filter(record => record.correct).length;
+    const total = records.length;
+    return {
+      date: TODAY(),
+      mode: 'preview',
+      correct,
+      total,
+      percent: total ? Math.round(correct / total * 100) : 0,
+      breakdowns: QuizEngine.buildBreakdowns(records),
+    };
+  },
+  calculateReadiness(recent) {
     const answered = recent.reduce((sum, result) => sum + (result.total || 0), 0);
     if (answered < READINESS_CONFIG.minimumAnswersForDiagnostic) {
       return { state: 'calibrating', answered, required: READINESS_CONFIG.minimumAnswersForDiagnostic };
@@ -1437,6 +1546,25 @@ const StatsManager = {
       required: state === 'building_evidence' ? READINESS_CONFIG.targetAnswersForReadiness : READINESS_CONFIG.minimumAnswersForDiagnostic,
       domains: eco,
     };
+  },
+  getReadiness(extraResults = []) {
+    const recent = [...(Array.isArray(extraResults) ? extraResults : []), ...this.getRecentClassifiedHistory()]
+      .filter(result => (result.breakdowns?.ecoDomain || []).length);
+    return this.calculateReadiness(recent);
+  },
+  getReadinessWithAdditionalAnswers(answerRecords) {
+    const records = Array.isArray(answerRecords) ? answerRecords : [];
+    return this.getReadiness(records.length ? [this.resultFromAnswerRecords(records)] : []);
+  },
+  previewReadinessDelta(answerRecordsBefore, answerRecordAfter) {
+    const beforeRecords = Array.isArray(answerRecordsBefore) ? answerRecordsBefore : [];
+    const afterRecords = answerRecordAfter ? [...beforeRecords, answerRecordAfter] : beforeRecords;
+    const before = this.getReadinessWithAdditionalAnswers(beforeRecords);
+    const after = this.getReadinessWithAdditionalAnswers(afterRecords);
+    const delta = before.state === 'ready' && after.state === 'ready'
+      ? after.score - before.score
+      : null;
+    return { before, after, delta };
   },
   getReadinessInsight(questions) {
     const readiness = this.getReadiness();
@@ -1581,48 +1709,80 @@ const QuizStartGuard = {
   },
 };
 
-// ==================== REPORT MODAL (shared by quiz / trial / trial-result) ====================
-// Wspólny helper zgłaszania błędów — używany przez Views.quiz, Views.trial i
-// Views['trial-result']. Pytanie podajemy jawnie przez open(question).
+// ==================== REPORT MODAL (question issues + general app problems) ====================
 const ReportModal = {
   _q: null,
+  _kind: 'question',
 
   open(question) {
     if (!question) return;
     this._q = question;
-    document.getElementById('report-modal')?.remove();
-    const q = question;
+    this._kind = 'question';
+    this._render();
+  },
 
-    const categories = [
-      { id: 'wrong_answer',  label: t('cat_wrong_answer') },
-      { id: 'unclear',       label: t('cat_unclear') },
-      { id: 'typo',          label: t('cat_typo') },
-      { id: 'translation',   label: t('cat_translation') },
-      { id: 'other',         label: t('cat_other') },
+  openApp() {
+    this._q = null;
+    this._kind = 'app';
+    this._render();
+  },
+
+  _questionCategories() {
+    return [
+      { id: 'wrong_answer',  label: t('cat_wrong_answer'), icon: Icons.xCircle() },
+      { id: 'unclear',       label: t('cat_unclear'), icon: Icons.helpCircle() },
+      { id: 'typo',          label: t('cat_typo'), icon: Icons.pencil() },
+      { id: 'translation',   label: t('cat_translation'), icon: Icons.globe() },
+      { id: 'other',         label: t('cat_other'), icon: Icons.messageCircle() },
     ];
+  },
+
+  _appCategories() {
+    return [
+      { id: 'bug',     label: t('cat_app_bug'), icon: Icons.bug() },
+      { id: 'ui',      label: t('cat_app_ui'), icon: Icons.palette() },
+      { id: 'sync',    label: t('cat_app_sync'), icon: Icons.sync() },
+      { id: 'login',   label: t('cat_app_login'), icon: Icons.login() },
+      { id: 'content', label: t('cat_app_content'), icon: Icons.pencil() },
+      { id: 'other',   label: t('cat_other'), icon: Icons.messageCircle() },
+    ];
+  },
+
+  _render() {
+    document.getElementById('report-modal')?.remove();
+    const isAppReport = this._kind === 'app';
+    const categories = isAppReport ? this._appCategories() : this._questionCategories();
     const chips = categories.map(c => `
       <button type="button" class="report-chip" data-cat="${c.id}"
               onclick="ReportModal._selectCat('${c.id}')">
-        ${c.label}
+        <span class="report-chip__icon">${c.icon}</span>
+        <span>${c.label}</span>
       </button>`).join('');
-    const preview = (() => {
+    const preview = isAppReport ? '' : (() => {
+      const q = this._q;
       const txt = (AppState.showEnglish && q.question_en) ? q.question_en : q.question;
       return txt.slice(0, 100) + (txt.length > 100 ? '…' : '');
     })();
+    const lead = isAppReport
+      ? `<p class="report-modal__question-preview">${t('report_app_desc')}</p>`
+      : `<p class="report-modal__question-preview">"${preview}"</p>`;
 
     const modal = document.createElement('div');
     modal.id = 'report-modal';
     modal.className = 'report-modal';
     modal.innerHTML = `
-      <div class="report-modal__card" role="dialog" aria-modal="true" aria-label="${t('report_aria')}">
+      <div class="report-modal__card" role="dialog" aria-modal="true" aria-label="${t(isAppReport ? 'app_report_aria' : 'report_aria')}">
         <div class="report-modal__header">
-          <span>${t('report_header')}</span>
+          <span class="report-modal__title">
+            <span class="report-modal__title-icon">${isAppReport ? Icons.bug() : Icons.flag()}</span>
+            <span>${t(isAppReport ? 'app_report_header' : 'report_header')}</span>
+          </span>
           <button class="report-modal__close" onclick="ReportModal.close()" aria-label="${t('close')}">✕</button>
         </div>
-        <p class="report-modal__question-preview">"${preview}"</p>
+        ${lead}
         <div class="report-modal__cats" id="report-cats">${chips}</div>
         <textarea id="report-comment" class="report-modal__textarea"
-                  placeholder="${t('report_comment_ph')}"
+                  placeholder="${t(isAppReport ? 'app_report_comment_ph' : 'report_comment_ph')}"
                   maxlength="500" rows="3"></textarea>
         <div id="report-modal-msg" class="report-modal__msg hidden"></div>
         <div class="report-modal__actions">
@@ -1648,8 +1808,6 @@ const ReportModal = {
   },
 
   async _submit() {
-    const q = this._q;
-    if (!q) return;
     const catEl     = document.querySelector('.report-chip.selected');
     const comment   = document.getElementById('report-comment')?.value.trim();
     const msgEl     = document.getElementById('report-modal-msg');
@@ -1659,12 +1817,18 @@ const ReportModal = {
     submitBtn.disabled    = true;
     submitBtn.textContent = '…';
     try {
-      await SupabaseSync.reportQuestion({
-        questionId:   q.id,
-        questionText: q.question,
-        category:     catEl.dataset.cat,
-        comment,
-      });
+      if (this._kind === 'app') {
+        await SupabaseSync.reportAppProblem({ category: catEl.dataset.cat, comment });
+      } else {
+        const q = this._q;
+        if (!q) return;
+        await SupabaseSync.reportQuestion({
+          questionId:   q.id,
+          questionText: q.question,
+          category:     catEl.dataset.cat,
+          comment,
+        });
+      }
       this.close();
       this.toast(t('report_sent'), true);
     } catch (e) {
@@ -2391,7 +2555,21 @@ Views.home = {
             </label>
           </div>
           <a class="settings-action-btn settings-action-btn--link"
-             href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
+             href="https://pmp.nord-star.pl/privacy-policy.html" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
+        </section>
+        <section class="settings-group">
+          <h3 class="settings-group__title">${t('settings_support')}</h3>
+          <div class="settings-row">
+            <div class="settings-row__info">
+              <span class="settings-row__icon">${Icons.bug()}</span>
+              <div>
+                <div class="settings-row__label">${t('report_app_problem')}</div>
+                <div class="settings-row__desc">${t('report_app_desc')}</div>
+              </div>
+            </div>
+          </div>
+          <button class="settings-action-btn settings-action-btn--support"
+                  onclick="Views.home._openAppReportModal()">${t('report_app_problem')}</button>
         </section>
         <section class="settings-group">
           <h3 class="settings-group__title">${t('settings_account')}</h3>
@@ -2405,6 +2583,10 @@ Views.home = {
 
   _closeSettings() {
     document.getElementById('settings-modal')?.remove();
+  },
+
+  _openAppReportModal() {
+    ReportModal.openApp();
   },
 
   _toggleConfidence(enabled) {
@@ -2744,23 +2926,31 @@ Views.trial = {
 
     const langToggle = (hasEn && AppState.isTester) ? `
       <button class="btn-lang-toggle" onclick="Views.trial._toggleLang()"
-              title="${showEn ? 'PL' : 'EN'}" aria-label="${showEn ? 'PL' : 'EN'}">${showEn ? '🇵🇱' : '🇬🇧'}</button>` : '';
+              data-lang="${showEn ? 'en' : 'pl'}"
+              title="${t('translate_question')}" aria-label="${t('translate_question')}">${Icons.translate()}</button>` : '';
+    const isFlagged = !!s.flags[i];
 
     return `
       <div class="screen trial">
         <div class="trial-header">
           <button class="quiz-abandon" onclick="Views.trial._abandon()" title="${t('trial_abandon')}">✕</button>
-          <span class="trial-timer" id="trial-timer">--:--</span>
+          <span class="trial-timer" id="trial-timer">--:--:--</span>
           <div class="trial-header__right">
-            ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.trial._report()" title="${t('report_title')}">🚩</button>` : ''}
+            ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.trial._report()" title="${t('report_title')}" aria-label="${t('report_title')}">${Icons.flag()}</button>` : ''}
             ${langToggle}
-            <button class="trial-flag ${s.flags[i] ? 'active' : ''}" onclick="Views.trial._toggleFlag()" title="${t('trial_flag')}">⚑︎</button>
           </div>
         </div>
-        <div class="trial-subbar">
-          <span class="trial-counter">${i + 1} / ${s.questions.length}</span>
-          ${q.domain ? `<span class="quiz-domain">${tDomain(q.domain)}</span>` : ''}
-          <button class="trial-palette-btn" onclick="Views.trial._togglePalette()">${t('trial_palette')}</button>
+        <div class="trial-question-meta">
+          <div class="trial-question-meta__main">
+            <span class="trial-counter">${t('trial_question_label')} ${i + 1} / ${s.questions.length}</span>
+            <div class="quiz-tags">${quizTagsHtml(q, true)}</div>
+          </div>
+          <div class="trial-question-meta__actions">
+            <button class="trial-flag ${isFlagged ? 'active' : ''}" onclick="Views.trial._toggleFlag()" title="${t('trial_flag')}" aria-pressed="${isFlagged ? 'true' : 'false'}">
+              ${Icons.flag()}<span>${isFlagged ? t('trial_flag_on') : t('trial_flag')}</span>
+            </button>
+            <button class="trial-palette-btn" onclick="Views.trial._togglePalette()" aria-expanded="false">${Icons.list()}<span>${t('trial_list')}</span></button>
+          </div>
         </div>
         <div class="quiz-question">${questionText}</div>
         <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
@@ -2797,7 +2987,13 @@ Views.trial = {
     const s = AppState.quizSession;
     s.flags[s.current] = !s.flags[s.current];
     Storage.saveTrialSession(s);
-    document.querySelector('.trial-flag')?.classList.toggle('active', s.flags[s.current]);
+    const btn = document.querySelector('.trial-flag');
+    if (btn) {
+      const active = s.flags[s.current];
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.innerHTML = `${Icons.flag()}<span>${active ? t('trial_flag_on') : t('trial_flag')}</span>`;
+    }
   },
 
   _prev() { const s = AppState.quizSession; if (s.current > 0) { s.current--; Storage.saveTrialSession(s); App.navigate('trial'); } },
@@ -2816,6 +3012,9 @@ Views.trial = {
   // ---- Paleta pytań ----
   _renderPalette() {
     const s = AppState.quizSession;
+    const answered = s.answers.filter(answer => answer !== null).length;
+    const flagged = s.flags.filter(Boolean).length;
+    const unanswered = s.questions.length - answered;
     const cells = s.questions.map((_, i) => {
       const cls = [
         'trial-pcell',
@@ -2823,23 +3022,43 @@ Views.trial = {
         s.flags[i] ? 'flagged' : '',
         i === s.current ? 'current' : '',
       ].filter(Boolean).join(' ');
-      return `<button class="${cls}" onclick="Views.trial._jump(${i})">${i + 1}</button>`;
+      return `<button class="${cls}" onclick="Views.trial._jump(${i})" aria-label="${t('trial_question_label')} ${i + 1}">${i + 1}</button>`;
     }).join('');
-    return `<div class="trial-palette__grid">${cells}</div>`;
+    return `
+      <div class="trial-palette__header">
+        <strong>${t('trial_palette_title')}</strong>
+        <div class="trial-palette__counts">
+          <span><b>${answered}</b> ${t('trial_answered')}</span>
+          <span><b>${unanswered}</b> ${t('trial_unanswered')}</span>
+          <span><b>${flagged}</b> ${t('trial_flagged')}</span>
+        </div>
+      </div>
+      <div class="trial-palette__legend">
+        <span><i class="trial-dot trial-dot--answered"></i>${t('trial_answered')}</span>
+        <span><i class="trial-dot trial-dot--empty"></i>${t('trial_unanswered')}</span>
+        <span><i class="trial-dot trial-dot--flagged"></i>${t('trial_flagged')}</span>
+      </div>
+      <div class="trial-palette__grid">${cells}</div>`;
   },
 
   _togglePalette(forceClose) {
     const el = document.getElementById('trial-palette');
     if (!el) return;
-    if (forceClose === true) { el.classList.add('hidden'); return; }
+    if (forceClose === true) {
+      el.classList.add('hidden');
+      document.querySelector('.trial-palette-btn')?.setAttribute('aria-expanded', 'false');
+      return;
+    }
     const willShow = el.classList.contains('hidden');
     if (willShow) {
       el.innerHTML = this._renderPalette();
       el.classList.remove('hidden');
+      document.querySelector('.trial-palette-btn')?.setAttribute('aria-expanded', 'true');
       // Przewiń do świeżo otwartej palety pytań.
       requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } else {
       el.classList.add('hidden');
+      document.querySelector('.trial-palette-btn')?.setAttribute('aria-expanded', 'false');
     }
   },
 
@@ -2857,10 +3076,8 @@ Views.trial = {
     const el = document.getElementById('trial-timer');
     if (leftMs <= 0) { this._stopTimer(); this._autoSubmit(); return; }
     const sec = Math.floor(leftMs / 1000);
-    const mm = String(Math.floor(sec / 60)).padStart(2, '0');
-    const ss = String(sec % 60).padStart(2, '0');
     if (el) {
-      el.textContent = `${mm}:${ss}`;
+      el.textContent = formatDurationHms(sec);
       el.classList.toggle('trial-timer--warn', leftMs <= 5 * 60000); // ostatnie 5 min
     }
   },
@@ -2987,7 +3204,8 @@ Views['trial-result'] = {
 
     const langToggle = (anyEn && AppState.isTester) ? `
       <button class="btn-lang-toggle" onclick="Views['trial-result']._toggleLang()"
-              title="${showEn ? 'PL' : 'EN'}" aria-label="${showEn ? 'PL' : 'EN'}">${showEn ? '🇵🇱' : '🇬🇧'}</button>` : '';
+              data-lang="${showEn ? 'en' : 'pl'}"
+              title="${t('translate_question')}" aria-label="${t('translate_question')}">${Icons.translate()}</button>` : '';
 
     const domainBars = (r.domainResults || []).slice().sort((a, b) => a.percent - b.percent).map(d => `
       <div class="domain-bar">
@@ -3020,7 +3238,7 @@ Views['trial-result'] = {
           <span class="trial-review__ans trial-review__ans--correct">✓ ${letters[correctIdx]}. ${displayAnswers[correctIdx]}</span>
         </div>` : '';
       const reportBtn = AppState.canReportBugs
-        ? `<button class="trial-review__report" onclick="Views['trial-result']._report(${i})" title="${t('report_title')}">🚩</button>` : '';
+        ? `<button class="trial-review__report" onclick="Views['trial-result']._report(${i})" title="${t('report_title')}" aria-label="${t('report_title')}">${Icons.flag()}</button>` : '';
 
       return `
         <div class="trial-review__item ${isCorrect ? 'is-correct' : 'is-wrong'}">
@@ -3147,9 +3365,11 @@ Views.quiz = {
     // Shows the flag of the language you'd switch TO.
     const langToggle = (hasEn && AppState.isTester) ? `
       <button class="btn-lang-toggle" onclick="Views.quiz._toggleLang()"
-              title="${showEn ? 'PL' : 'EN'}" aria-label="${showEn ? 'PL' : 'EN'}">
-        ${showEn ? '🇵🇱' : '🇬🇧'}
+              data-lang="${showEn ? 'en' : 'pl'}"
+              title="${t('translate_question')}" aria-label="${t('translate_question')}">
+        ${Icons.translate()}
       </button>` : '';
+    const expPreview = Engagement.questionExp(true);
 
     return `
       <div class="screen quiz">
@@ -3159,15 +3379,20 @@ Views.quiz = {
           </div>
           <span class="quiz-counter">${session.current + 1} / ${total}</span>
           <div class="quiz-header__right">
-            ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}">🚩</button>` : ''}
+            ${AppState.canReportBugs ? `<button class="quiz-report-btn" onclick="Views.quiz._openReportModal()" title="${t('report_title')}" aria-label="${t('report_title')}">${Icons.flag()}</button>` : ''}
             ${langToggle}
           </div>
         </div>
         <div class="quiz-progress">
           <div class="quiz-progress__bar" style="width:${pct}%"></div>
         </div>
-        <div class="quiz-context">${sessionLabel}</div>
-        <div class="quiz-tags">${quizTagsHtml(q)}</div>
+        <div class="quiz-meta-row">
+          <div class="quiz-meta-main">
+            <span class="quiz-context">${sessionLabel}</span>
+            <div class="quiz-tags">${quizTagsHtml(q, true)}</div>
+          </div>
+          <span class="quiz-exp-chip" id="quiz-exp-chip">+${expPreview} EXP</span>
+        </div>
         <div class="quiz-question">${questionText}</div>
         <div class="quiz-answers" id="quiz-answers">${answerBtns}</div>
         <div id="explanation-panel" class="hidden"></div>
@@ -3199,9 +3424,10 @@ Views.quiz = {
     // 3. Swap flag on the toggle button itself
     const toggleBtn = document.querySelector('.btn-lang-toggle');
     if (toggleBtn) {
-      toggleBtn.textContent = showEn ? '🇵🇱' : '🇬🇧';
-      toggleBtn.title       = showEn ? 'PL' : 'EN';
-      toggleBtn.setAttribute('aria-label', showEn ? 'PL' : 'EN');
+      toggleBtn.dataset.lang = showEn ? 'en' : 'pl';
+      toggleBtn.innerHTML = Icons.translate();
+      toggleBtn.title = t('translate_question');
+      toggleBtn.setAttribute('aria-label', t('translate_question'));
     }
 
     // 4. If explanation panel is already visible, swap its text too
@@ -3215,9 +3441,9 @@ Views.quiz = {
     const explLangBtn = document.querySelector('.btn-lang-sm');
     if (explLangBtn) {
       explLangBtn.dataset.showing = showEn ? 'en' : 'pl';
-      explLangBtn.textContent     = showEn ? '🇵🇱' : '🇬🇧';
-      explLangBtn.title           = showEn ? 'PL' : 'EN';
-      explLangBtn.setAttribute('aria-label', showEn ? 'PL' : 'EN');
+      explLangBtn.innerHTML = Icons.translate();
+      explLangBtn.title = t('translate_question');
+      explLangBtn.setAttribute('aria-label', t('translate_question'));
     }
   },
 
@@ -3297,9 +3523,19 @@ Views.quiz = {
       else if (idx === selectedIndex && !isCorrect) btn.classList.add('wrong');
     });
 
+    const answersBefore = session.answers.slice();
+    const answerRecord = QuizEngine.answerRecord(q, isCorrect);
+    const readinessPreview = StatsManager.previewReadinessDelta(answersBefore, answerRecord);
+    const readinessDeltaText = readinessPreview.delta === null
+      ? t('readiness_question_calibrating')
+      : t('readiness_question_delta', { n: `${readinessPreview.delta > 0 ? '+' : ''}${readinessPreview.delta}%` });
+    const questionExp = Engagement.questionExp(isCorrect);
+
     QuizEngine.recordAnswer(q.id, isCorrect, confidence);
     Storage.recordConfidence(q.id, confidence, isCorrect);
-    session.answers.push(QuizEngine.answerRecord(q, isCorrect));
+    session.answers.push(answerRecord);
+    const expChip = document.getElementById('quiz-exp-chip');
+    if (expChip) expChip.textContent = `+${questionExp} EXP`;
 
     if (!session.recentlyShown) session.recentlyShown = [];
     session.recentlyShown.push(q.id);
@@ -3316,19 +3552,25 @@ Views.quiz = {
       <button class="btn-sm btn-lang-sm"
               onclick="Views.quiz._toggleExplLang(this, ${session.current})"
               data-showing="${showEn ? 'en' : 'pl'}"
-              title="${showEn ? 'PL' : 'EN'}" aria-label="${showEn ? 'PL' : 'EN'}">
-        ${showEn ? '🇵🇱' : '🇬🇧'}
+              title="${t('translate_question')}" aria-label="${t('translate_question')}">
+        ${Icons.translate()}
       </button>` : '';
 
     panel.innerHTML = `
       <div class="feedback-card ${isCorrect ? 'feedback-card--correct' : 'feedback-card--wrong'}">
         <div class="explanation-header">
-          <span class="explanation-verdict">${isCorrect ? t('verdict_correct') : t('verdict_wrong')}</span>
+          <div class="explanation-title">
+            <span class="explanation-title__icon">${Icons.bookOpen()}</span>
+            <h3>${t('why_answer_good')}</h3>
+          </div>
           ${explanationLangBtn}
         </div>
-        <h3>${t('why_answer')}</h3>
-        <div class="quiz-tags quiz-tags--feedback">${quizTagsHtml(q, true)}</div>
+        <span class="explanation-verdict ${isCorrect ? 'explanation-verdict--correct' : 'explanation-verdict--wrong'}">${isCorrect ? t('verdict_correct') : t('verdict_wrong')}</span>
         <p class="explanation-text" id="expl-text">${explanationText}</p>
+        <div class="feedback-impact">
+          <span>${Icons.trendUp()}</span>
+          <strong>${readinessDeltaText}</strong>
+        </div>
       </div>
       <button class="btn-next" onclick="Views.quiz._advance()">${t('next')}</button>`;
 
@@ -3356,10 +3598,9 @@ Views.quiz = {
         : q.explanation;
     }
     btn.dataset.showing = newShowing;
-    // Show the flag of the language you'd switch TO next
-    btn.textContent = newShowing === 'en' ? '🇵🇱' : '🇬🇧';
-    btn.title = newShowing === 'en' ? 'PL' : 'EN';
-    btn.setAttribute('aria-label', newShowing === 'en' ? 'PL' : 'EN');
+    btn.innerHTML = Icons.translate();
+    btn.title = t('translate_question');
+    btn.setAttribute('aria-label', t('translate_question'));
   },
 
   // ---- Zgłaszanie błędów (wspólny ReportModal) ----

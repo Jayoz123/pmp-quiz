@@ -69,11 +69,60 @@ const READINESS_CONFIG = {
   minimumPerEcoDomain: 20,
   targetPerEcoDomain: 40,
 };
+const labelFor = (_labels, key) => key;
+const tDomain = key => key;
+const tEcoDomain = key => key;
+const tApproach = key => key;
+const tQtype = key => key;
+const tDifficulty = key => key;
+const questionTagItems = (question, detailed = false) => {
+  const tags = [
+    question.domain && { kind: 'domain', text: tDomain(question.domain), className: 'quiz-tag--domain' },
+    question.eco_domain && { kind: 'eco', text: tEcoDomain(question.eco_domain), className: 'quiz-tag--eco' },
+    ...(question.approach_tags || []).map(tag => ({ kind: 'approach', text: tApproach(tag), className: 'quiz-tag--approach' })),
+  ].filter(Boolean);
+  if (detailed && question.qtype) tags.push({ kind: 'qtype', text: tQtype(question.qtype), className: 'quiz-tag--detail' });
+  if (detailed && question.difficulty) tags.push({ kind: 'difficulty', text: tDifficulty(question.difficulty), className: 'quiz-tag--detail' });
+  return tags;
+};
+function formatDurationHms(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hh = String(Math.floor(safeSeconds / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((safeSeconds % 3600) / 60)).padStart(2, '0');
+  const ss = String(safeSeconds % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
 function formatDisplayNick(nick) {
   const trimmed = String(nick || '').trim();
   if (!trimmed) return '';
   return trimmed.charAt(0).toLocaleUpperCase() + trimmed.slice(1);
 }
+const AppProblemReport = {
+  sanitizeHash(hash) {
+    return String(hash || '').startsWith('#/') ? hash : null;
+  },
+  sanitizeHref(href) {
+    try {
+      const url = new URL(href);
+      return `${url.origin}${url.pathname}`;
+    } catch {
+      return null;
+    }
+  },
+  buildPayload({ userId, category, comment, appVersion, userAgent, pageHref, pageHash, settings = {} }) {
+    return {
+      user_id: userId,
+      category,
+      comment: comment || null,
+      app_version: appVersion || null,
+      user_agent: userAgent || null,
+      page_href: this.sanitizeHref(pageHref),
+      page_hash: this.sanitizeHash(pageHash),
+      app_language: settings.defaultLanguage || null,
+      app_theme: settings.theme || null,
+    };
+  },
+};
 const filterForSegment = (dimension, key) => {
   const filters = emptyFilters();
   const filterKey = { domain: 'domains', ecoDomain: 'ecoDomains', approach: 'approachTags', difficulty: 'difficulties', qtype: 'qtypes' }[dimension];
@@ -197,9 +246,10 @@ const QuizSessionPersistence = {
 };
 
 const Engagement = {
+  questionExp(wasCorrect) { return wasCorrect ? 5 : 1; },
   scoreAnswers({ correct, total, mode }) {
     const wrong = total - correct;
-    let careerExp = correct * 5 + wrong;
+    let careerExp = correct * this.questionExp(true) + wrong * this.questionExp(false);
     let rankingDelta = correct * 2 - wrong * 2;
     if (mode === 'daily') careerExp += 20;
     if (mode === 'daily' && correct / total >= 0.7) rankingDelta += 5;
@@ -398,8 +448,20 @@ const StatsManager = {
       key, ...item, percent: Math.round(item.correct / item.total * 100),
     }));
   },
-  getReadiness() {
-    const recent = this.getRecentClassifiedHistory();
+  resultFromAnswerRecords(answerRecords) {
+    const records = Array.isArray(answerRecords) ? answerRecords : [];
+    const correct = records.filter(record => record.correct).length;
+    const total = records.length;
+    return {
+      date: TODAY(),
+      mode: 'preview',
+      correct,
+      total,
+      percent: total ? Math.round(correct / total * 100) : 0,
+      breakdowns: QuizEngine.buildBreakdowns(records),
+    };
+  },
+  calculateReadiness(recent) {
     const answered = recent.reduce((sum, result) => sum + (result.total || 0), 0);
     if (answered < READINESS_CONFIG.minimumAnswersForDiagnostic) {
       return { state: 'calibrating', answered, required: READINESS_CONFIG.minimumAnswersForDiagnostic };
@@ -433,6 +495,25 @@ const StatsManager = {
       required: state === 'building_evidence' ? READINESS_CONFIG.targetAnswersForReadiness : READINESS_CONFIG.minimumAnswersForDiagnostic,
       domains: eco,
     };
+  },
+  getReadiness(extraResults = []) {
+    const recent = [...(Array.isArray(extraResults) ? extraResults : []), ...this.getRecentClassifiedHistory()]
+      .filter(result => (result.breakdowns?.ecoDomain || []).length);
+    return this.calculateReadiness(recent);
+  },
+  getReadinessWithAdditionalAnswers(answerRecords) {
+    const records = Array.isArray(answerRecords) ? answerRecords : [];
+    return this.getReadiness(records.length ? [this.resultFromAnswerRecords(records)] : []);
+  },
+  previewReadinessDelta(answerRecordsBefore, answerRecordAfter) {
+    const beforeRecords = Array.isArray(answerRecordsBefore) ? answerRecordsBefore : [];
+    const afterRecords = answerRecordAfter ? [...beforeRecords, answerRecordAfter] : beforeRecords;
+    const before = this.getReadinessWithAdditionalAnswers(beforeRecords);
+    const after = this.getReadinessWithAdditionalAnswers(afterRecords);
+    const delta = before.state === 'ready' && after.state === 'ready'
+      ? after.score - before.score
+      : null;
+    return { before, after, delta };
   },
   getReadinessInsight(questions) {
     const readiness = this.getReadiness();
@@ -902,11 +983,116 @@ test('readiness treats an ECO domain below minimum sample as coverage gap', () =
   assertEqual(gap.state, 'building_evidence');
   assertEqual(gap.coverageGap.key, 'Business Environment');
 });
+test('previewReadinessDelta reports positive delta for a correct classified answer', () => {
+  reset();
+  Storage.saveResult(classifiedResult(60, 90, {
+    People: { correct: 20, total: 30 },
+    Process: { correct: 20, total: 30 },
+    'Business Environment': { correct: 20, total: 30 },
+  }));
+  const delta = StatsManager.previewReadinessDelta([], {
+    questionId: 901,
+    correct: true,
+    domain: 'Risk',
+    ecoDomain: 'Process',
+    ecoTask: 'Process task',
+    difficulty: 'medium',
+    qtype: 'knowledge',
+    approachTags: ['agile'],
+  });
+  assert(delta.delta > 0, `expected positive readiness delta, got ${delta.delta}`);
+});
+test('previewReadinessDelta does not report positive delta for a wrong answer', () => {
+  reset();
+  Storage.saveResult(classifiedResult(60, 90, {
+    People: { correct: 20, total: 30 },
+    Process: { correct: 20, total: 30 },
+    'Business Environment': { correct: 20, total: 30 },
+  }));
+  const delta = StatsManager.previewReadinessDelta([], {
+    questionId: 902,
+    correct: false,
+    domain: 'Risk',
+    ecoDomain: 'Process',
+    ecoTask: 'Process task',
+    difficulty: 'medium',
+    qtype: 'knowledge',
+    approachTags: ['agile'],
+  });
+  assert(delta.delta <= 0, `expected non-positive readiness delta, got ${delta.delta}`);
+});
+test('previewReadinessDelta returns null delta while readiness is calibrating', () => {
+  reset();
+  Storage.saveResult(classifiedResult(18, 20, {
+    Process: { correct: 18, total: 20 },
+  }));
+  const delta = StatsManager.previewReadinessDelta([], {
+    questionId: 903,
+    correct: true,
+    domain: 'Risk',
+    ecoDomain: 'Process',
+    ecoTask: 'Process task',
+    difficulty: 'medium',
+    qtype: 'knowledge',
+    approachTags: ['agile'],
+  });
+  assertEqual(delta.delta, null);
+  assertEqual(delta.after.state, 'calibrating');
+});
 
 console.log('\nDisplay helpers:');
 test('formatDisplayNick capitalizes lowercase nick', () => assertEqual(formatDisplayNick('bartek'), 'Bartek'));
 test('formatDisplayNick leaves already capitalized nick unchanged', () => assertEqual(formatDisplayNick('Bartosz'), 'Bartosz'));
 test('formatDisplayNick trims whitespace before capitalization', () => assertEqual(formatDisplayNick('  bartosz '), 'Bartosz'));
+test('questionTagItems includes qtype and difficulty only in detail mode', () => {
+  const q = {
+    domain: 'Risk',
+    eco_domain: 'Process',
+    approach_tags: ['agile'],
+    qtype: 'knowledge',
+    difficulty: 'hard',
+  };
+  assertEqual(questionTagItems(q, false).map(item => item.kind), ['domain', 'eco', 'approach']);
+  assertEqual(questionTagItems(q, true).map(item => item.kind), ['domain', 'eco', 'approach', 'qtype', 'difficulty']);
+});
+
+console.log('\nApp problem reports:');
+test('buildPayload stores report details and app context', () => {
+  const row = AppProblemReport.buildPayload({
+    userId: 'user-123',
+    category: 'sync',
+    comment: 'Progress did not sync',
+    appVersion: 'build-test',
+    userAgent: 'NodeTest/1.0',
+    pageHref: 'https://pmp.nord-star.pl/?code=secret#/settings',
+    pageHash: '#/settings',
+    settings: { defaultLanguage: 'en', theme: 'dark' },
+  });
+  assertEqual(row, {
+    user_id: 'user-123',
+    category: 'sync',
+    comment: 'Progress did not sync',
+    app_version: 'build-test',
+    user_agent: 'NodeTest/1.0',
+    page_href: 'https://pmp.nord-star.pl/',
+    page_hash: '#/settings',
+    app_language: 'en',
+    app_theme: 'dark',
+  });
+});
+
+test('buildPayload drops non-route hashes that may contain tokens', () => {
+  const row = AppProblemReport.buildPayload({
+    userId: 'user-123',
+    category: 'login',
+    comment: '',
+    pageHref: 'https://pmp.nord-star.pl/?code=secret#access_token=secret',
+    pageHash: '#access_token=secret',
+  });
+  assertEqual(row.page_href, 'https://pmp.nord-star.pl/');
+  assertEqual(row.page_hash, null);
+  assertEqual(row.comment, null);
+});
 
 console.log('\nEngagement:');
 test('wrong answers never subtract career EXP and do not create negative ranking points', () => {
@@ -931,6 +1117,12 @@ test('trial awards completion EXP and positive ranking only after submission', (
   assertEqual(award.careerExp, 402);
   assert(award.rankingDelta > 0);
 });
+test('questionExp mirrors per-answer career EXP scoring', () => {
+  assertEqual(Engagement.questionExp(true), 5);
+  assertEqual(Engagement.questionExp(false), 1);
+  const quick = Engagement.scoreAnswers({ correct: 7, total: 10, mode: 'quick' });
+  assertEqual(quick.careerExp, 7 * Engagement.questionExp(true) + 3 * Engagement.questionExp(false));
+});
 test('career levels are non-decreasing with accumulated EXP', () => {
   assertEqual(Engagement.levelForExp(0), 1);
   assert(Engagement.levelForExp(400) >= Engagement.levelForExp(100));
@@ -942,6 +1134,12 @@ test('trialVariant returns matching variant', () => assertEqual(trialVariant('ha
 test('trialVariant falls back to full', () => assertEqual(trialVariant('nope').id, 'full'));
 test('variant times: full=230, half=115, short=77', () => {
   assert(trialVariant('full').minutes === 230 && trialVariant('half').minutes === 115 && trialVariant('short').minutes === 77);
+});
+test('formatDurationHms renders hours, minutes, and seconds', () => {
+  assertEqual(formatDurationHms(0), '00:00:00');
+  assertEqual(formatDurationHms(65), '00:01:05');
+  assertEqual(formatDurationHms(4620), '01:17:00');
+  assertEqual(formatDurationHms(13800), '03:50:00');
 });
 test('variant questions: 180/90/60', () => {
   assert(trialVariant('full').questions === 180 && trialVariant('half').questions === 90 && trialVariant('short').questions === 60);
