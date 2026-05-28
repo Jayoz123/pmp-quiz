@@ -63,7 +63,7 @@ git push origin main
    assetów (`questions.json`, `app.js`, `styles.css`, `index.html`, `manifest.json`,
    ikony) i wstrzykuje `APP_VERSION = 'build-xxxxxxxx'` do `app.js` i `service-worker.js`
 3. Deployuje folder `pmp-quiz-app/` na Cloudflare Workers
-4. Aplikacja jest żywa pod: **https://pmp-quiz-app.bart100larski.workers.dev**
+4. Aplikacja jest żywa pod: **https://pmp.nord-star.pl**
 
 Czas od push do live: **~1-2 minuty**.
 
@@ -112,7 +112,7 @@ Powinieneś zobaczyć nowy run z nazwą `"Deploy to Cloudflare Pages"` ze status
 
 **Krok 4 — zweryfikuj wersję na produkcji (~2 minuty po push)**
 
-Otwórz https://pmp-quiz-app.bart100larski.workers.dev w trybie incognito i sprawdź w konsoli przeglądarki (F12 → Console):
+Otwórz https://pmp.nord-star.pl w trybie incognito i sprawdź w konsoli przeglądarki (F12 → Console):
 
 ```
 APP_VERSION
@@ -128,7 +128,7 @@ i NIE być placeholderem `"build-00000000"`. Jeśli tak — CI/CD działa popraw
 | Workflow odpalił się | GitHub → Actions | Nowy run widoczny po push |
 | Workflow przeszedł bez błędu | GitHub → Actions → ostatni run | Zielony ptaszek ✅ |
 | `APP_VERSION` zaktualizowany | Konsola przeglądarki na prod | `build-xxxxxxxx` (nie placeholder) |
-| Strona się ładuje | https://pmp-quiz-app.bart100larski.workers.dev | Aplikacja działa |
+| Strona się ładuje | https://pmp.nord-star.pl | Aplikacja działa |
 
 > Jeśli wszystkie 4 punkty są zielone — pipeline jest sprawny i możesz deployować bez ręcznej weryfikacji.
 
@@ -174,7 +174,7 @@ wrangler.toml           ← konfiguracja Cloudflare (nie edytuj)
 
 ## Linki
 
-- **Aplikacja (produkcja):** https://pmp-quiz-app.bart100larski.workers.dev
+- **Aplikacja (produkcja):** https://pmp.nord-star.pl
 - **Repo GitHub:** https://github.com/Jayoz123/pmp-quiz
 - **GitHub Actions:** https://github.com/Jayoz123/pmp-quiz/actions
 - **Cloudflare Pages Dashboard:** https://dash.cloudflare.com
