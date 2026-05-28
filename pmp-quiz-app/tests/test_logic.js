@@ -61,6 +61,19 @@ const Storage = {
 };
 
 const emptyFilters = () => ({ domains: [], ecoDomains: [], approachTags: [], difficulties: [], qtypes: [] });
+const ECO_DOMAIN_KEYS = ['People', 'Process', 'Business Environment'];
+const READINESS_CONFIG = {
+  minimumAnswersForDiagnostic: 30,
+  minimumAnswersForReadiness: 90,
+  targetAnswersForReadiness: 120,
+  minimumPerEcoDomain: 20,
+  targetPerEcoDomain: 40,
+};
+function formatDisplayNick(nick) {
+  const trimmed = String(nick || '').trim();
+  if (!trimmed) return '';
+  return trimmed.charAt(0).toLocaleUpperCase() + trimmed.slice(1);
+}
 const filterForSegment = (dimension, key) => {
   const filters = emptyFilters();
   const filterKey = { domain: 'domains', ecoDomain: 'ecoDomains', approach: 'approachTags', difficulty: 'difficulties', qtype: 'qtypes' }[dimension];
@@ -192,8 +205,9 @@ const Engagement = {
     if (mode === 'daily' && correct / total >= 0.7) rankingDelta += 5;
     if (mode === 'trial') careerExp += 50;
     if (mode === 'trial' && correct / total >= 0.8) careerExp += 100;
-    return { careerExp, rankingDelta };
+    return { careerExp, rankingDelta: this.clampRankingScore(rankingDelta) };
   },
+  clampRankingScore(score) { return Math.max(0, Number(score) || 0); },
   levelForExp(exp) { return Math.floor(Math.sqrt(Math.max(0, exp) / 100)) + 1; },
 };
 
@@ -358,7 +372,7 @@ const StatsManager = {
       return { domain, percent: Math.round(correct / total * 100), total };
     });
   },
-  getRecentClassifiedHistory(days = 30, maxAnswers = 100) {
+  getRecentClassifiedHistory(days = 30, maxAnswers = READINESS_CONFIG.targetAnswersForReadiness) {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
     let answered = 0;
     return Storage.getHistory().slice().reverse().filter(result => {
@@ -381,16 +395,57 @@ const StatsManager = {
   getReadiness() {
     const recent = this.getRecentClassifiedHistory();
     const answered = recent.reduce((sum, result) => sum + (result.total || 0), 0);
-    if (answered < 30) return { state: 'calibrating', answered, required: 30 };
+    if (answered < READINESS_CONFIG.minimumAnswersForDiagnostic) {
+      return { state: 'calibrating', answered, required: READINESS_CONFIG.minimumAnswersForDiagnostic };
+    }
     const correct = recent.reduce((sum, result) => sum + (result.correct || 0), 0);
     const accuracy = Math.round(correct / answered * 100);
-    const eco = this.aggregateBreakdown(recent, 'ecoDomain').filter(item => item.total >= 5);
-    const coverage = eco.length
-      ? Math.round(eco.reduce((sum, item) => sum + item.percent, 0) / eco.length)
-      : accuracy;
-    const score = Math.round(accuracy * 0.65 + coverage * 0.35);
-    const weakest = eco.slice().sort((a, b) => a.percent - b.percent)[0] || null;
-    return { state: 'ready', score, accuracy, coverage, weakest, answered };
+    const byDomain = Object.fromEntries(this.aggregateBreakdown(recent, 'ecoDomain').map(item => [item.key, item]));
+    const eco = ECO_DOMAIN_KEYS.map(key => {
+      const item = byDomain[key] || { key, correct: 0, total: 0 };
+      return { ...item, percent: item.total ? Math.round(item.correct / item.total * 100) : 0 };
+    });
+    const ecoAnswered = eco.reduce((sum, item) => sum + item.total, 0);
+    const ecoCorrect = eco.reduce((sum, item) => sum + item.correct, 0);
+    const rawMastery = ecoAnswered ? Math.round(ecoCorrect / ecoAnswered * 100) : accuracy;
+    const answeredFactor = Math.min(1, answered / READINESS_CONFIG.targetAnswersForReadiness);
+    const minEcoCoverageFactor = eco.reduce((sum, item) => {
+      return sum + Math.min(1, item.total / READINESS_CONFIG.targetPerEcoDomain);
+    }, 0) / ECO_DOMAIN_KEYS.length;
+    const coverageFactor = answeredFactor * minEcoCoverageFactor;
+    const score = Math.round(rawMastery * coverageFactor);
+    const sampled = eco.filter(item => item.total >= 5);
+    const weakest = sampled.slice().sort((a, b) => a.percent - b.percent || b.total - a.total)[0] || null;
+    const coverageGap = eco
+      .filter(item => item.total < READINESS_CONFIG.minimumPerEcoDomain)
+      .sort((a, b) => a.total - b.total || ECO_DOMAIN_KEYS.indexOf(a.key) - ECO_DOMAIN_KEYS.indexOf(b.key))[0] || null;
+    const state = answered >= READINESS_CONFIG.minimumAnswersForReadiness && !coverageGap
+      ? 'ready'
+      : 'building_evidence';
+    return {
+      state, score, accuracy, coverageFactor, rawMastery, weakest, coverageGap, answered,
+      required: state === 'building_evidence' ? READINESS_CONFIG.targetAnswersForReadiness : READINESS_CONFIG.minimumAnswersForDiagnostic,
+      domains: eco,
+    };
+  },
+  getReadinessInsight(questions) {
+    const readiness = this.getReadiness();
+    const hasQuestions = Array.isArray(questions) && questions.length > 0;
+    const canTrain = item => hasQuestions && QuizEngine.countAvailable(questions, 'quick', filterForSegment('ecoDomain', item.key)) >= 10;
+    const weakEnough = readiness.weakest && readiness.weakest.total >= READINESS_CONFIG.minimumPerEcoDomain && canTrain(readiness.weakest);
+    const gapTrainable = readiness.coverageGap && canTrain(readiness.coverageGap);
+    const recommended = weakEnough
+      ? { dimension: 'ecoDomain', key: readiness.weakest.key, total: readiness.weakest.total, percent: readiness.weakest.percent, filters: filterForSegment('ecoDomain', readiness.weakest.key) }
+      : gapTrainable
+        ? { dimension: 'ecoDomain', key: readiness.coverageGap.key, total: readiness.coverageGap.total, percent: readiness.coverageGap.percent, filters: filterForSegment('ecoDomain', readiness.coverageGap.key), reason: 'coverage' }
+        : this.getRecommendation(questions);
+    return {
+      readiness,
+      recommended,
+      primaryGapLabel: recommended ? recommended.key : readiness.weakest?.key || readiness.coverageGap?.key || null,
+      evidenceLabel: readiness.state === 'ready' ? 'Gotowosc treningowa' : 'Diagnoza wstepna',
+      weeklyDelta: null,
+    };
   },
   getRecommendation(questions) {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
@@ -786,15 +841,76 @@ test('readiness identifies the weakest ECO segment after calibration', () => {
     'Business Environment': { correct: 7, total: 10 },
   }));
   const readiness = StatsManager.getReadiness();
-  assertEqual(readiness.state, 'ready');
+  assertEqual(readiness.state, 'building_evidence');
   assertEqual(readiness.weakest.key, 'Process');
 });
+test('readiness shows preliminary diagnosis after 30 low-accuracy answers, not full readiness', () => {
+  reset();
+  Storage.saveResult(classifiedResult(10, 30, {
+    People: { correct: 4, total: 10 },
+    Process: { correct: 3, total: 10 },
+    'Business Environment': { correct: 3, total: 10 },
+  }));
+  const readiness = StatsManager.getReadiness();
+  assertEqual(readiness.state, 'building_evidence');
+  assert(readiness.score < 33, `expected coverage-adjusted score below 33, got ${readiness.score}`);
+});
+test('readiness penalizes 30 answers concentrated in one ECO domain', () => {
+  reset();
+  Storage.saveResult(classifiedResult(27, 30, {
+    Process: { correct: 27, total: 30 },
+  }));
+  const readiness = StatsManager.getReadiness();
+  assertEqual(readiness.state, 'building_evidence');
+  assertEqual(readiness.coverageGap.key, 'People');
+  assert(readiness.score < 30, `expected low score from missing coverage, got ${readiness.score}`);
+});
+test('readiness is ready with 120 evenly covered ECO answers', () => {
+  reset();
+  Storage.saveResult(classifiedResult(96, 120, {
+    People: { correct: 32, total: 40 },
+    Process: { correct: 30, total: 40 },
+    'Business Environment': { correct: 34, total: 40 },
+  }));
+  const readiness = StatsManager.getReadiness();
+  assertEqual(readiness.state, 'ready');
+  assertEqual(readiness.score, 80);
+});
+test('readiness treats an ECO domain below minimum sample as coverage gap', () => {
+  reset();
+  Storage.saveResult(classifiedResult(90, 120, {
+    People: { correct: 42, total: 50 },
+    Process: { correct: 42, total: 50 },
+    'Business Environment': { correct: 6, total: 20 },
+  }));
+  const readiness = StatsManager.getReadiness();
+  assertEqual(readiness.state, 'ready');
+  assertEqual(readiness.weakest.key, 'Business Environment');
+
+  reset();
+  Storage.saveResult(classifiedResult(90, 120, {
+    People: { correct: 45, total: 60 },
+    Process: { correct: 45, total: 60 },
+  }));
+  const gap = StatsManager.getReadiness();
+  assertEqual(gap.state, 'building_evidence');
+  assertEqual(gap.coverageGap.key, 'Business Environment');
+});
+
+console.log('\nDisplay helpers:');
+test('formatDisplayNick capitalizes lowercase nick', () => assertEqual(formatDisplayNick('bartek'), 'Bartek'));
+test('formatDisplayNick leaves already capitalized nick unchanged', () => assertEqual(formatDisplayNick('Bartosz'), 'Bartosz'));
+test('formatDisplayNick trims whitespace before capitalization', () => assertEqual(formatDisplayNick('  bartosz '), 'Bartosz'));
 
 console.log('\nEngagement:');
-test('wrong answers never subtract career EXP but lower ranking score', () => {
+test('wrong answers never subtract career EXP and do not create negative ranking points', () => {
   assertEqual(Engagement.scoreAnswers({ correct: 7, total: 10, mode: 'quick' }), {
     careerExp: 38,
     rankingDelta: 8,
+  });
+  assertEqual(Engagement.scoreAnswers({ correct: 2, total: 10, mode: 'quick' }), {
+    careerExp: 18,
+    rankingDelta: 0,
   });
 });
 test('trial awards completion EXP and positive ranking only after submission', () => {
