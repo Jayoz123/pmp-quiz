@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-0e0ab74c';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-864f1863';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -32,6 +32,12 @@ const Engagement = {
     return { careerExp, rankingDelta: this.clampRankingScore(rankingDelta) };
   },
   clampRankingScore(score) { return Math.max(0, Number(score) || 0); },
+  normalizeLeaderboardRows(rows) {
+    return (rows || []).map(item => ({
+      ...item,
+      score: this.clampRankingScore(item.ranking_score ?? item.score),
+    }));
+  },
   levelForExp(exp) { return Math.floor(Math.sqrt(Math.max(0, exp) / 100)) + 1; },
 };
 const newSessionId = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -268,6 +274,7 @@ const I18N = {
   adaptive_training:  { pl: 'Trening adaptacyjny',              en: 'Adaptive training' },
   start_training:     { pl: 'Rozpocznij trening',               en: 'Start training' },
   streak_metric:      { pl: 'Seria',                            en: 'Streak' },
+  ranking_points:     { pl: 'Punkty rankingu',                  en: 'Ranking points' },
   ranking_private:    { pl: 'Prywatny',                         en: 'Private' },
   no_result:          { pl: 'Brak danych',                      en: 'No data' },
   progress_title:     { pl: 'Postęp',                           en: 'Progress' },
@@ -375,8 +382,8 @@ const I18N = {
   leaderboard_week:   { pl: 'Tydzień',                          en: 'Week' },
   leaderboard_month:  { pl: 'Miesiąc',                          en: 'Month' },
   leaderboard_all:    { pl: 'Ogółem',                           en: 'All time' },
-  leaderboard_empty:  { pl: 'Brak wyników dla wybranego okresu.', en: 'No scores in this period.' },
-  leaderboard_score:  { pl: 'Wynik',                            en: 'Score' },
+  leaderboard_empty:  { pl: 'Brak punktów rankingu.',            en: 'No ranking points yet.' },
+  leaderboard_score:  { pl: 'Punkty',                           en: 'Points' },
   leaderboard_loading:{ pl: 'Wczytywanie rankingu...',          en: 'Loading leaderboard...' },
   leaderboard_unavailable:{ pl: 'Ranking jest chwilowo niedostępny.', en: 'The leaderboard is temporarily unavailable.' },
   leaderboard_position:{ pl: 'Pozycja',                         en: 'Position' },
@@ -743,7 +750,7 @@ const EngagementSync = {
   async getLeaderboard(period) {
     const { data, error } = await sb().rpc('get_public_leaderboard', { p_period: period, p_limit: 50 });
     if (error) throw error;
-    return (data || []).map(item => ({ ...item, score: Engagement.clampRankingScore(item.score) }));
+    return Engagement.normalizeLeaderboardRows(data);
   },
 };
 
@@ -2169,7 +2176,7 @@ Views.home = {
     const gapCta = recommended && readiness.state !== 'calibrating'
       ? `<button class="btn-primary readiness-gap__cta" onclick="Views['mode-select']._applyTraining('${recommended.dimension}', '${recommended.key}')">${t('practice_gap')}</button>`
       : '';
-    const rankingMeta = AppState.engagement.leaderboardVisible ? t('leaderboard_title') : t('ranking_private');
+    const rankingMeta = AppState.engagement.leaderboardVisible ? t('ranking_points') : t('ranking_private');
 
     return `
       <div class="screen home">
@@ -3616,8 +3623,6 @@ Views.ranking = {
 
   render() {
     const visible = AppState.engagement.leaderboardVisible;
-    const tabs = ['week', 'month', 'all'].map(period => `
-      <button class="${this._period === period ? 'selected' : ''}" onclick="Views.ranking._setPeriod('${period}')">${t('leaderboard_' + period)}</button>`).join('');
     const rows = this._rows.map(item => `
       <div class="leaderboard-row ${item.nick === AppState.nick ? 'is-me' : ''}">
         <strong>#${item.rank}</strong>
@@ -3634,7 +3639,6 @@ Views.ranking = {
       <div class="screen ranking">
         <h1>${t('leaderboard_title')}</h1>
         ${visible ? `
-          <div class="leaderboard-tabs">${tabs}</div>
           <section class="leaderboard-table">
             <div class="leaderboard-head"><span>${t('leaderboard_position')}</span><span>Nick</span><span>${t('leaderboard_score')}</span></div>
             ${content}

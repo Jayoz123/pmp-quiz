@@ -208,6 +208,12 @@ const Engagement = {
     return { careerExp, rankingDelta: this.clampRankingScore(rankingDelta) };
   },
   clampRankingScore(score) { return Math.max(0, Number(score) || 0); },
+  normalizeLeaderboardRows(rows) {
+    return (rows || []).map(item => ({
+      ...item,
+      score: this.clampRankingScore(item.ranking_score ?? item.score),
+    }));
+  },
   levelForExp(exp) { return Math.floor(Math.sqrt(Math.max(0, exp) / 100)) + 1; },
 };
 
@@ -912,6 +918,13 @@ test('wrong answers never subtract career EXP and do not create negative ranking
     careerExp: 18,
     rankingDelta: 0,
   });
+});
+test('leaderboard rows use the persisted ranking score as points', () => {
+  assertEqual(Engagement.normalizeLeaderboardRows([
+    { nick: 'bartek', score: -12, ranking_score: 16, career_exp: 128 },
+  ]), [
+    { nick: 'bartek', score: 16, ranking_score: 16, career_exp: 128 },
+  ]);
 });
 test('trial awards completion EXP and positive ranking only after submission', () => {
   const award = Engagement.scoreAnswers({ correct: 48, total: 60, mode: 'trial' });
