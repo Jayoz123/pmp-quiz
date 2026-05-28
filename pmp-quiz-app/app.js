@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-04603aec';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-8929e8ab';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -223,6 +223,12 @@ const I18N = {
   daily_pending:      { pl: '30 pytań · Wymagane dziś',         en: '30 questions · Required today' },
   quick_quiz:         { pl: 'Szybki Quiz',                      en: 'Quick Quiz' },
   quick_quiz_sub:     { pl: 'Trening celowany lub losowy',       en: 'Targeted or random training' },
+  resume_quiz_title:  { pl: 'Wróć do quizu',                    en: 'Resume quiz' },
+  resume_quiz_sub:    { pl: '{mode}, {progress}',               en: '{mode}, {progress}' },
+  quiz_conflict_title:{ pl: 'Masz niedokończony quiz',           en: 'You have an unfinished quiz' },
+  quiz_conflict_sub:  { pl: 'Możesz dokończyć poprzednią sesję albo zakończyć ją i rozpocząć nową.', en: 'You can finish the previous session or end it and start a new one.' },
+  resume_previous_quiz:{ pl: 'Dokończ poprzedni',                en: 'Resume previous' },
+  discard_and_start:  { pl: 'Zakończ i zacznij nowy',            en: 'End and start new' },
   statistics:         { pl: 'Statystyki',                       en: 'Statistics' },
   your_progress:      { pl: 'Twój postęp',                      en: 'Your progress' },
   welcome_back:       { pl: 'Cześć, {nick}',                    en: 'Hello, {nick}' },
@@ -449,6 +455,27 @@ const Storage = {
   },
   getHistory()          { return this._get('quiz_history', []); },
   saveResult(r)         { const h = this.getHistory(); h.push(r); this._set('quiz_history', h); },
+  _isResumableQuizSession(s) {
+    return !!s
+      && s.mode !== 'trial'
+      && Array.isArray(s.questions)
+      && s.questions.length > 0
+      && Array.isArray(s.answers)
+      && s.answers.length > 0
+      && Number.isInteger(s.current)
+      && s.current >= 0
+      && s.current < s.questions.length;
+  },
+  getActiveQuizSession() {
+    const session = this._get('active_quiz_session', null);
+    if (!this._isResumableQuizSession(session)) {
+      this.clearActiveQuizSession();
+      return null;
+    }
+    return session;
+  },
+  saveActiveQuizSession(s) { this._set('active_quiz_session', s); },
+  clearActiveQuizSession() { try { localStorage.removeItem('active_quiz_session'); } catch {} },
   getStreakData()           { return this._get('streak_data', {}); },
   saveStreakData(d)         { this._set('streak_data', d); },
   getStreakWeekStartDow()   { return this._get('streak_week_start_dow', null); },
@@ -1404,6 +1431,83 @@ const AppState = {
   sessionKickedMsg: null, // set when SessionGuard kicks this device; shown once on the login screen
 };
 
+const QuizSessionPersistence = {
+  buildResumableCopy(session, nextCurrent = session?.current) {
+    if (!session || session.mode === 'trial' || !Array.isArray(session.questions) || !Array.isArray(session.answers)) return null;
+    if (session.answers.length === 0) return null;
+    if (!Number.isInteger(nextCurrent) || nextCurrent < 0 || nextCurrent >= session.questions.length) return null;
+    return { ...session, current: nextCurrent, currentAnswer: null };
+  },
+  save(session, nextCurrent = session?.current) {
+    const resumable = this.buildResumableCopy(session, nextCurrent);
+    if (resumable) Storage.saveActiveQuizSession(resumable);
+    else Storage.clearActiveQuizSession();
+  },
+  buildResumeProgressLabel(session) {
+    const answered = Array.isArray(session?.answers) ? session.answers.length : 0;
+    const total = Array.isArray(session?.questions) ? session.questions.length : 0;
+    return `${answered} / ${total}`;
+  },
+  modeLabel(session) {
+    if (session?.mode === 'daily') return t('daily_challenge');
+    if (session?.mode === 'weak') return t('session_weak');
+    return t('quick_quiz');
+  },
+};
+
+const QuizStartGuard = {
+  _pendingStart: null,
+
+  requestStart(startFn) {
+    const active = Storage.getActiveQuizSession();
+    if (!active) {
+      startFn();
+      return true;
+    }
+    this._pendingStart = startFn;
+    this._showConflict(active);
+    return false;
+  },
+
+  resume() {
+    document.getElementById('quiz-conflict-modal')?.remove();
+    this._pendingStart = null;
+    const active = Storage.getActiveQuizSession();
+    if (!active) return;
+    AppState.quizSession = active;
+    App.navigate('quiz');
+  },
+
+  discardAndStart() {
+    document.getElementById('quiz-conflict-modal')?.remove();
+    const startFn = this._pendingStart;
+    this._pendingStart = null;
+    Storage.clearActiveQuizSession();
+    if (typeof startFn === 'function') startFn();
+  },
+
+  _showConflict(active) {
+    document.getElementById('quiz-conflict-modal')?.remove();
+    const el = document.createElement('div');
+    el.id = 'quiz-conflict-modal';
+    el.className = 'settings-modal';
+    el.innerHTML = `
+      <div class="settings-modal__card" role="dialog" aria-modal="true" aria-label="${t('quiz_conflict_title')}">
+        <div class="settings-modal__header"><span>${t('quiz_conflict_title')}</span></div>
+        <p class="quiz-conflict__sub">${t('quiz_conflict_sub')}</p>
+        <p class="quiz-conflict__meta">${t('resume_quiz_sub', {
+          mode: QuizSessionPersistence.modeLabel(active),
+          progress: QuizSessionPersistence.buildResumeProgressLabel(active),
+        })}</p>
+        <div class="summary__actions quiz-conflict__actions">
+          <button class="btn-secondary" onclick="QuizStartGuard.discardAndStart()">${t('discard_and_start')}</button>
+          <button class="btn-primary" onclick="QuizStartGuard.resume()">${t('resume_previous_quiz')}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+  },
+};
+
 // ==================== REPORT MODAL (shared by quiz / trial / trial-result) ====================
 // Wspólny helper zgłaszania błędów — używany przez Views.quiz, Views.trial i
 // Views['trial-result']. Pytanie podajemy jawnie przez open(question).
@@ -1945,6 +2049,7 @@ Views.home = {
     const readiness  = StatsManager.getReadiness();
     const recommended = StatsManager.getRecommendation(AppState.questions);
     const latestResult = Storage.getHistory().slice(-1)[0];
+    const activeQuiz = Storage.getActiveQuizSession();
     const nick = AppState.nick || t('learner');
     const exp = AppState.engagement.careerExp;
     const level = Engagement.levelForExp(exp);
@@ -2034,6 +2139,18 @@ Views.home = {
             <div class="recommended-training__score">${recommended.percent}% · ${recommended.total} ${t('responses')}</div>
             <button class="btn-primary" onclick="Views['mode-select']._applyTraining('${recommended.dimension}', '${recommended.key}')">${t('practice_10')}</button>
           </div>` : ''}
+          ${activeQuiz ? `
+          <button class="menu-btn menu-btn--resume" onclick="Views.home._resumeActiveQuiz()">
+            <span class="menu-btn__icon">${Icons.training()}</span>
+            <div class="menu-btn__content">
+              <div class="menu-btn__title">${t('resume_quiz_title')}</div>
+              <div class="menu-btn__sub">${t('resume_quiz_sub', {
+                mode: QuizSessionPersistence.modeLabel(activeQuiz),
+                progress: QuizSessionPersistence.buildResumeProgressLabel(activeQuiz),
+              })}</div>
+            </div>
+            <span class="menu-btn__arrow">›</span>
+          </button>` : ''}
           <button class="menu-btn" onclick="App.navigate('mode-select')">
             <span class="menu-btn__icon">${Icons.training()}</span>
             <div class="menu-btn__content">
@@ -2268,6 +2385,16 @@ Views.home = {
     Storage.clearTrialSession();
   },
 
+  _resumeActiveQuiz() {
+    const active = Storage.getActiveQuizSession();
+    if (!active) {
+      App.render();
+      return;
+    }
+    AppState.quizSession = active;
+    App.navigate('quiz');
+  },
+
   init() {
     // PWA install banner placeholder — no-op until install prompt logic is implemented
   },
@@ -2389,8 +2516,11 @@ Views['mode-select'] = {
       alert(t('no_questions_filter'));
       return;
     }
-    AppState.quizSession = { sessionId: newSessionId(), questions, current: 0, answers: [], mode: this._selectedMode, filters: this._filters, shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
-    App.navigate('quiz');
+    const session = { sessionId: newSessionId(), questions, current: 0, answers: [], mode: this._selectedMode, filters: this._filters, shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
+    QuizStartGuard.requestStart(() => {
+      AppState.quizSession = session;
+      App.navigate('quiz');
+    });
   },
 
   init() {},
@@ -2412,8 +2542,11 @@ Views['daily-start'] = {
       return;
     }
     const questions = QuizEngine.selectQuestions(AppState.questions, 'daily');
-    AppState.quizSession = { sessionId: newSessionId(), questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
-    App.navigate('quiz');
+    const session = { sessionId: newSessionId(), questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
+    QuizStartGuard.requestStart(() => {
+      AppState.quizSession = session;
+      App.navigate('quiz');
+    });
   },
 };
 
@@ -3057,6 +3190,7 @@ Views.quiz = {
 
     if (!session.recentlyShown) session.recentlyShown = [];
     session.recentlyShown.push(q.id);
+    QuizSessionPersistence.save(session, session.current + 1);
 
     const panel = document.getElementById('explanation-panel');
     panel.classList.remove('hidden');
@@ -3124,6 +3258,7 @@ Views.quiz = {
   // ---- koniec zgłaszania błędów ----
 
   _abandon() {
+    if (!AppState.quizSession?.answers?.length) Storage.clearActiveQuizSession();
     AppState.quizSession = null;
     App.navigate('home');
   },
@@ -3135,6 +3270,7 @@ Views.quiz = {
     if (session.current >= session.questions.length) {
       this._finishQuiz();
     } else {
+      QuizSessionPersistence.save(session);
       App.navigate('quiz');
     }
   },
@@ -3178,6 +3314,7 @@ Views.quiz = {
 
     const award = { sessionId: session.sessionId || newSessionId(), mode: session.mode, correct, total };
     AppState.lastSummary = { correct, total, percent, bestStreak, weakestDomain, weakestSegment, streakExtended, mode: session.mode, readinessAfter, readinessDelta, rewardPending: true };
+    Storage.clearActiveQuizSession();
     AppState.quizSession = null;
     App.navigate('summary');
     EngagementSync.award(award).then(reward => {

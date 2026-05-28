@@ -19,6 +19,27 @@ const Storage = {
   _set(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
   getHistory()          { return this._get('quiz_history', []); },
   saveResult(r)         { const h = this.getHistory(); h.push(r); this._set('quiz_history', h); },
+  _isResumableQuizSession(s) {
+    return !!s
+      && s.mode !== 'trial'
+      && Array.isArray(s.questions)
+      && s.questions.length > 0
+      && Array.isArray(s.answers)
+      && s.answers.length > 0
+      && Number.isInteger(s.current)
+      && s.current >= 0
+      && s.current < s.questions.length;
+  },
+  getActiveQuizSession() {
+    const session = this._get('active_quiz_session', null);
+    if (!this._isResumableQuizSession(session)) {
+      this.clearActiveQuizSession();
+      return null;
+    }
+    return session;
+  },
+  saveActiveQuizSession(s) { this._set('active_quiz_session', s); },
+  clearActiveQuizSession() { try { localStorage.removeItem('active_quiz_session'); } catch {} },
   getStreakData()        { return this._get('streak_data', {}); },
   saveStreakData(d)      { this._set('streak_data', d); },
   getWeakQuestions()    { return this._get('weak_questions', {}); },
@@ -147,6 +168,20 @@ const QuizEngine = {
 };
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
+
+const QuizSessionPersistence = {
+  buildResumableCopy(session, nextCurrent = session?.current) {
+    if (!session || session.mode === 'trial' || !Array.isArray(session.questions) || !Array.isArray(session.answers)) return null;
+    if (session.answers.length === 0) return null;
+    if (!Number.isInteger(nextCurrent) || nextCurrent < 0 || nextCurrent >= session.questions.length) return null;
+    return { ...session, current: nextCurrent, currentAnswer: null };
+  },
+  buildResumeProgressLabel(session) {
+    const answered = Array.isArray(session?.answers) ? session.answers.length : 0;
+    const total = Array.isArray(session?.questions) ? session.questions.length : 0;
+    return `${answered} / ${total}`;
+  },
+};
 
 const Engagement = {
   scoreAnswers({ correct, total, mode }) {
@@ -411,6 +446,32 @@ test('saveResult accumulates', () => {
   Storage.saveResult({ date: '2026-01-02', percent: 90, total: 10 });
   assert(Storage.getHistory().length === 2);
 });
+test('getActiveQuizSession returns null initially', () => {
+  reset();
+  assertEqual(Storage.getActiveQuizSession(), null);
+});
+test('active quiz session is resumable only after one answer with remaining questions', () => {
+  reset();
+  const session = { mode: 'quick', questions: [{ id: 1 }, { id: 2 }], current: 1, answers: [{ questionId: 1, correct: true }] };
+  Storage.saveActiveQuizSession(session);
+  assertEqual(Storage.getActiveQuizSession().current, 1);
+});
+test('active quiz session ignores sessions without answers', () => {
+  reset();
+  Storage.saveActiveQuizSession({ mode: 'quick', questions: [{ id: 1 }], current: 0, answers: [] });
+  assertEqual(Storage.getActiveQuizSession(), null);
+});
+test('active quiz session ignores completed sessions', () => {
+  reset();
+  Storage.saveActiveQuizSession({ mode: 'quick', questions: [{ id: 1 }], current: 1, answers: [{ questionId: 1, correct: true }] });
+  assertEqual(Storage.getActiveQuizSession(), null);
+});
+test('clearActiveQuizSession removes saved session', () => {
+  reset();
+  Storage.saveActiveQuizSession({ mode: 'quick', questions: [{ id: 1 }, { id: 2 }], current: 1, answers: [{ questionId: 1, correct: true }] });
+  Storage.clearActiveQuizSession();
+  assertEqual(Storage.getActiveQuizSession(), null);
+});
 test('getStreakData returns {} initially', () => { reset(); assertEqual(Storage.getStreakData(), {}); });
 test('saveStreakData round-trips', () => {
   Storage.saveStreakData({ '2026-01-01': 'daily' });
@@ -552,6 +613,33 @@ test('buildBreakdowns stores counts and includes each approach tag', () => {
   const breakdowns = QuizEngine.buildBreakdowns(answers);
   assertEqual(breakdowns.approach.find(item => item.key === 'agile'), { key: 'agile', correct: 1, total: 2, percent: 50 });
   assertEqual(breakdowns.approach.find(item => item.key === 'hybrid'), { key: 'hybrid', correct: 0, total: 1, percent: 0 });
+});
+
+// ===== QUIZ SESSION PERSISTENCE TESTS =====
+console.log('\nQuizSessionPersistence:');
+test('buildResumableCopy returns null before first answer', () => {
+  const session = { mode: 'quick', questions: [{ id: 1 }, { id: 2 }], current: 0, answers: [], currentAnswer: null };
+  assertEqual(QuizSessionPersistence.buildResumableCopy(session, 0), null);
+});
+test('buildResumableCopy stores next unanswered question after first answer', () => {
+  const session = {
+    mode: 'quick',
+    questions: [{ id: 1 }, { id: 2 }],
+    current: 0,
+    answers: [{ questionId: 1, correct: true }],
+    currentAnswer: { selectedIndex: 0, isCorrect: true, processed: true },
+  };
+  const resumable = QuizSessionPersistence.buildResumableCopy(session, 1);
+  assertEqual(resumable.current, 1);
+  assertEqual(resumable.currentAnswer, null);
+});
+test('buildResumableCopy returns null after final answer', () => {
+  const session = { mode: 'quick', questions: [{ id: 1 }], current: 0, answers: [{ questionId: 1, correct: true }], currentAnswer: null };
+  assertEqual(QuizSessionPersistence.buildResumableCopy(session, 1), null);
+});
+test('buildResumeProgressLabel reports answered and total counts', () => {
+  const session = { mode: 'quick', questions: [{ id: 1 }, { id: 2 }, { id: 3 }], current: 1, answers: [{ questionId: 1, correct: true }] };
+  assertEqual(QuizSessionPersistence.buildResumeProgressLabel(session), '1 / 3');
 });
 
 // ===== STREAK MANAGER TESTS =====

@@ -485,6 +485,14 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .menu-btn__title { font-size: 1rem; font-weight: 600; }
 .menu-btn__sub { font-size: 0.82rem; color: var(--text2); margin-top: 2px; }
 .menu-btn__arrow { font-size: 1.4rem; color: var(--text2); }
+.menu-btn--resume {
+  border: 1px solid rgba(37, 99, 235, 0.34);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), var(--surface));
+}
+.menu-btn--resume .menu-btn__icon,
+.menu-btn--resume .menu-btn__title {
+  color: var(--accent);
+}
 .menu-btn--daily.pending .menu-btn__icon { animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
@@ -1361,6 +1369,25 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   border-radius: var(--radius-sm);
 }
 .settings-modal__close:hover { background: var(--surface2); }
+.quiz-conflict__sub,
+.quiz-conflict__meta {
+  color: var(--text2);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.quiz-conflict__meta {
+  color: var(--text);
+  font-weight: 700;
+}
+.quiz-conflict__actions {
+  flex-direction: column;
+  margin-top: 12px;
+}
+.quiz-conflict__actions .btn-primary,
+.quiz-conflict__actions .btn-secondary {
+  flex: 1;
+}
 .settings-group { padding: 2px 0 14px; }
 .settings-group + .settings-group { border-top: 1px solid var(--border); padding-top: 18px; }
 .settings-group__title {
