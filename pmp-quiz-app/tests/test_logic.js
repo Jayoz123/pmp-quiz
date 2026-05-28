@@ -148,6 +148,20 @@ const QuizEngine = {
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
+const Engagement = {
+  scoreAnswers({ correct, total, mode }) {
+    const wrong = total - correct;
+    let careerExp = correct * 5 + wrong;
+    let rankingDelta = correct * 2 - wrong * 2;
+    if (mode === 'daily') careerExp += 20;
+    if (mode === 'daily' && correct / total >= 0.7) rankingDelta += 5;
+    if (mode === 'trial') careerExp += 50;
+    if (mode === 'trial' && correct / total >= 0.8) careerExp += 100;
+    return { careerExp, rankingDelta };
+  },
+  levelForExp(exp) { return Math.floor(Math.sqrt(Math.max(0, exp) / 100)) + 1; },
+};
+
 // ===== TRIAL EXAM (plan 12) — mirror app.js =====
 const TRIAL_VARIANTS = [
   { id: 'full',  questions: 180, minutes: 230 },
@@ -686,6 +700,23 @@ test('readiness identifies the weakest ECO segment after calibration', () => {
   const readiness = StatsManager.getReadiness();
   assertEqual(readiness.state, 'ready');
   assertEqual(readiness.weakest.key, 'Process');
+});
+
+console.log('\nEngagement:');
+test('wrong answers never subtract career EXP but lower ranking score', () => {
+  assertEqual(Engagement.scoreAnswers({ correct: 7, total: 10, mode: 'quick' }), {
+    careerExp: 38,
+    rankingDelta: 8,
+  });
+});
+test('trial awards completion EXP and positive ranking only after submission', () => {
+  const award = Engagement.scoreAnswers({ correct: 48, total: 60, mode: 'trial' });
+  assertEqual(award.careerExp, 402);
+  assert(award.rankingDelta > 0);
+});
+test('career levels are non-decreasing with accumulated EXP', () => {
+  assertEqual(Engagement.levelForExp(0), 1);
+  assert(Engagement.levelForExp(400) >= Engagement.levelForExp(100));
 });
 
 // ===== TRIAL EXAM TESTS (plan 12, sekcja 19a) =====

@@ -135,6 +135,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .home-identity { display: flex; flex-direction: column; gap: 2px; }
 .home-identity span { color: var(--text2); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .home-identity strong { font-size: 1.1rem; }
+.career-level { color: var(--accent); font-size: .72rem; font-weight: 700; margin-top: 3px; }
 .btn-settings {
   background: var(--surface);
   border: none;
@@ -866,6 +867,17 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .summary-readiness strong { color: var(--accent); font-size: 1.25rem; }
 .summary-readiness small { grid-column: 1 / -1; color: var(--green); font-size: .8rem; font-weight: 600; }
 .summary-readiness p { grid-column: 1 / -1; color: var(--text2); font-size: .72rem; line-height: 1.45; margin-top: 6px; }
+.exp-reward {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--green-light);
+  color: var(--green);
+  font-size: .9rem;
+  font-weight: 700;
+  text-align: center;
+}
+.reward-pending { color: var(--text2); font-size: .8rem; text-align: center; }
 .btn-secondary {
   flex: 1; padding: 14px;
   background: var(--border);
@@ -933,6 +945,37 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .total-item__label { font-size: 0.78rem; color: var(--text2); opacity: 0.75; }
 .stats-readiness__score { color: var(--accent); font-size: 2rem; font-weight: 800; margin: 6px 0; }
 .stats-readiness p { color: var(--text2); font-size: .84rem; line-height: 1.5; }
+.ranking { display: flex; flex-direction: column; gap: 18px; padding-bottom: 88px; }
+.ranking h1 { font-size: 1.3rem; font-weight: 800; }
+.leaderboard-private {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.leaderboard-private .ui-icon { width: 38px; height: 38px; color: var(--accent); }
+.leaderboard-private h2 { font-size: 1.05rem; }
+.leaderboard-private p { color: var(--text2); font-size: .86rem; line-height: 1.5; }
+.leaderboard-private .btn-primary { width: 100%; margin-top: 8px; }
+.leaderboard-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--surface2); padding: 4px; border-radius: var(--radius-sm); }
+.leaderboard-tabs button { padding: 10px 6px; border-radius: var(--radius-xs); color: var(--text2); font-size: .84rem; font-weight: 700; }
+.leaderboard-tabs .selected { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+.leaderboard-table { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.leaderboard-head, .leaderboard-row { display: grid; grid-template-columns: 58px 1fr 70px; align-items: center; padding: 13px 14px; gap: 8px; }
+.leaderboard-head { color: var(--text2); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); }
+.leaderboard-head span:last-child, .leaderboard-row b { text-align: right; }
+.leaderboard-row { border-bottom: 1px solid var(--border); font-size: .9rem; }
+.leaderboard-row:last-child { border-bottom: 0; }
+.leaderboard-row strong { color: var(--text2); font-size: .82rem; }
+.leaderboard-row b { color: var(--accent); font-size: .9rem; }
+.leaderboard-row.is-me { background: var(--accent-light); }
+.leaderboard-state { color: var(--text2); font-size: .86rem; padding: 24px 14px; text-align: center; }
+.leaderboard-state--error { color: var(--red); }
 .badges-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .badge-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
 .badge-item__emoji { font-size: 1.8rem; }
@@ -1296,6 +1339,8 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   max-width: var(--max-width);
   width: 100%;
   margin: 0 auto;
+  max-height: min(92vh, 700px);
+  overflow-y: auto;
   animation: slideUp 0.25s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 .settings-modal__header {
@@ -1438,7 +1483,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 /* ==================== SYNC INDICATOR ==================== */
 .sync-indicator {
   position: fixed;
-  bottom: 12px;
+  bottom: 84px;
   right: 12px;
   font-size: 0.7rem;
   color: #aaa;
@@ -1461,6 +1506,39 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   opacity: 0.6;
   letter-spacing: 0.03em;
 }
+
+.home, .mode-select, .stats { padding-bottom: 88px; }
+.app-nav {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 10px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  width: calc(100% - 32px);
+  max-width: calc(var(--max-width) - 32px);
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+}
+.app-nav button {
+  min-height: 54px;
+  border-radius: 15px;
+  color: var(--text2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: .67rem;
+  font-weight: 700;
+}
+.app-nav .ui-icon { width: 20px; height: 20px; }
+.app-nav button.active { color: var(--accent); background: var(--accent-light); }
 
 /* ==================== TRIAL EXAM (plan 12) ==================== */
 /* --- Wybór długości --- */

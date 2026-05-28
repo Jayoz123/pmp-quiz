@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-0c05e9b8';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-c088eade';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -20,6 +20,20 @@ const QUIZ_SIZES   = { daily: 30, quick: 10, weak: 10 };
 const SRS_COOLDOWN = 15; // min questions before re-showing the same weak question
 const GOOGLE_OAUTH_VISIBLE = false; // Keep the Google beta flow dormant until invites are managed automatically.
 const TODAY = () => new Date().toISOString().slice(0, 10);
+const Engagement = {
+  scoreAnswers({ correct, total, mode }) {
+    const wrong = total - correct;
+    let careerExp = correct * 5 + wrong;
+    let rankingDelta = correct * 2 - wrong * 2;
+    if (mode === 'daily') careerExp += 20;
+    if (mode === 'daily' && correct / total >= 0.7) rankingDelta += 5;
+    if (mode === 'trial') careerExp += 50;
+    if (mode === 'trial' && correct / total >= 0.8) careerExp += 100;
+    return { careerExp, rankingDelta };
+  },
+  levelForExp(exp) { return Math.floor(Math.sqrt(Math.max(0, exp) / 100)) + 1; },
+};
+const newSessionId = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 const BRAND_NAME = 'PM Academy';
 const Icons = {
   mark: () => '<img class="brand-mark" src="./icons/pm-academy-mark.svg" alt="">',
@@ -34,7 +48,16 @@ const Icons = {
   scroll: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4v16m-5-5 5 5 5-5"/></svg>',
   language: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>',
   theme: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 15.5A8.5 8.5 0 1 1 8.5 4 7 7 0 0 0 20 15.5z"/></svg>',
+  home: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-6v-6h-4v6H4z"/></svg>',
+  ranking: () => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 21v-7h4v7M10 21V8h4v13M14 21V3h4v18"/></svg>',
 };
+const appNav = active => `
+  <nav class="app-nav" aria-label="${t('nav_label')}">
+    <button class="${active === 'home' ? 'active' : ''}" onclick="App.navigate('home')">${Icons.home()}<span>${t('nav_start')}</span></button>
+    <button class="${active === 'training' ? 'active' : ''}" onclick="App.navigate('mode-select')">${Icons.training()}<span>${t('nav_training')}</span></button>
+    <button class="${active === 'stats' ? 'active' : ''}" onclick="App.navigate('stats')">${Icons.stats()}<span>${t('nav_progress')}</span></button>
+    <button class="${active === 'ranking' ? 'active' : ''}" onclick="App.navigate('ranking')">${Icons.ranking()}<span>${t('nav_ranking')}</span></button>
+  </nav>`;
 
 // ==================== TRIAL EXAM (plan 12) ====================
 // Prawdziwy egzamin PMP: 230 min / 180 pyt ≈ 1.2778 min/pyt — skalujemy proporcjonalnie.
@@ -217,9 +240,17 @@ const I18N = {
   latest_result:      { pl: 'Ostatni wynik',                    en: 'Latest score' },
   no_result:          { pl: 'Brak danych',                      en: 'No data' },
   progress_title:     { pl: 'Postęp',                           en: 'Progress' },
+  level:              { pl: 'Poziom {n}',                       en: 'Level {n}' },
+  career_exp:         { pl: '{n} EXP',                          en: '{n} EXP' },
+  nav_label:          { pl: 'Główna nawigacja',                 en: 'Main navigation' },
+  nav_start:          { pl: 'Start',                            en: 'Start' },
+  nav_training:       { pl: 'Trening',                          en: 'Training' },
+  nav_progress:       { pl: 'Postęp',                           en: 'Progress' },
+  nav_ranking:        { pl: 'Ranking',                          en: 'Ranking' },
   // settings modal
   settings_learning:  { pl: 'Nauka',                            en: 'Learning' },
   settings_display:   { pl: 'Wygląd i język',                   en: 'Appearance and language' },
+  settings_privacy:   { pl: 'Ranking i prywatność',             en: 'Ranking and privacy' },
   settings_account:   { pl: 'Konto',                            en: 'Account' },
   close:              { pl: 'Zamknij',                          en: 'Close' },
   confidence_label:   { pl: 'Ocena pewności',                   en: 'Confidence rating' },
@@ -237,6 +268,9 @@ const I18N = {
   theme_auto:         { pl: 'Auto',                             en: 'Auto' },
   sign_out:           { pl: 'Wyloguj się',                      en: 'Sign out' },
   privacy_policy:     { pl: 'Polityka prywatności ↗',           en: 'Privacy policy ↗' },
+  leaderboard_visible:{ pl: 'Pokazuj mnie w publicznym rankingu', en: 'Show me in the public leaderboard' },
+  leaderboard_desc:   { pl: 'Widoczny będzie tylko Twój nick, pozycja i wynik/EXP.', en: 'Only your nick, position and score/EXP will be visible.' },
+  leaderboard_error:  { pl: 'Nie udało się zapisać ustawienia rankingu.', en: 'Could not save leaderboard setting.' },
   sign_out_confirm:   { pl: 'Wylogować się?',                   en: 'Sign out?' },
   // mode select
   back:               { pl: '‹ Wróć',                           en: '‹ Back' },
@@ -301,6 +335,20 @@ const I18N = {
   train_area:         { pl: 'Ćwicz ten obszar',                 en: 'Train this area' },
   play_again:         { pl: 'Zagraj ponownie',                  en: 'Play again' },
   readiness_delta:    { pl: 'Zmiana gotowości: {n} pkt',        en: 'Readiness change: {n} pts' },
+  reward_pending:     { pl: 'Nagroda zsynchronizuje się przy kolejnym połączeniu.', en: 'Your reward will sync on the next connection.' },
+  exp_awarded:        { pl: '+{n} EXP',                         en: '+{n} EXP' },
+  leaderboard_title:  { pl: 'Ranking',                          en: 'Leaderboard' },
+  leaderboard_private:{ pl: 'Twój udział jest wyłączony',       en: 'Your participation is off' },
+  leaderboard_private_desc:{ pl: 'Dołącz dobrowolnie. Publicznie widoczne będą tylko nick, pozycja i wynik/EXP.', en: 'Join voluntarily. Only your nick, position and score/EXP become public.' },
+  leaderboard_join:   { pl: 'Dołącz do rankingu',               en: 'Join leaderboard' },
+  leaderboard_week:   { pl: 'Tydzień',                          en: 'Week' },
+  leaderboard_month:  { pl: 'Miesiąc',                          en: 'Month' },
+  leaderboard_all:    { pl: 'Ogółem',                           en: 'All time' },
+  leaderboard_empty:  { pl: 'Brak wyników dla wybranego okresu.', en: 'No scores in this period.' },
+  leaderboard_score:  { pl: 'Wynik',                            en: 'Score' },
+  leaderboard_loading:{ pl: 'Wczytywanie rankingu...',          en: 'Loading leaderboard...' },
+  leaderboard_unavailable:{ pl: 'Ranking jest chwilowo niedostępny.', en: 'The leaderboard is temporarily unavailable.' },
+  leaderboard_position:{ pl: 'Pozycja',                         en: 'Position' },
   // stats
   avg_correct:        { pl: 'Średnia poprawnych odpowiedzi',    en: 'Average correct answers' },
   d3:                 { pl: '3 dni',                            en: '3 days' },
@@ -435,6 +483,15 @@ const Storage = {
   getTrialSession()   { return this._get('trial_session', null); },
   saveTrialSession(s) { this._set('trial_session', s); },
   clearTrialSession() { try { localStorage.removeItem('trial_session'); } catch {} },
+  getPendingAwards()  { return this._get('pending_engagement_awards', []); },
+  queueAward(award) {
+    const pending = this.getPendingAwards().filter(item => item.sessionId !== award.sessionId);
+    pending.push(award);
+    this._set('pending_engagement_awards', pending);
+  },
+  removePendingAward(sessionId) {
+    this._set('pending_engagement_awards', this.getPendingAwards().filter(item => item.sessionId !== sessionId));
+  },
 };
 
 // ==================== SUPABASE SYNC ====================
@@ -580,6 +637,61 @@ const SupabaseSync = {
       console.warn('reportQuestion failed:', e);
       throw e;
     }
+  },
+};
+
+const EngagementSync = {
+  _setState(row) {
+    if (!row) return;
+    AppState.engagement = {
+      careerExp: row.career_exp ?? 0,
+      rankingScore: row.ranking_score ?? 0,
+      leaderboardVisible: row.leaderboard_visible ?? false,
+    };
+  },
+  async pullMe() {
+    const { data: { session } } = await sb().auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return null;
+    const { data, error } = await sb()
+      .from('user_engagement')
+      .select('career_exp, ranking_score, leaderboard_visible')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    this._setState(data);
+    return data;
+  },
+  async award(award) {
+    Storage.queueAward(award);
+    const { data, error } = await sb().rpc('award_quiz_session', {
+      p_session_id: award.sessionId,
+      p_mode: award.mode,
+      p_correct: award.correct,
+      p_total: award.total,
+    });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    Storage.removePendingAward(award.sessionId);
+    this._setState(row);
+    return row;
+  },
+  async flushPending() {
+    for (const award of Storage.getPendingAwards()) {
+      try { await this.award(award); } catch (e) { console.warn('award retry failed:', e); break; }
+    }
+  },
+  async setVisibility(visible) {
+    const { data, error } = await sb().rpc('set_leaderboard_visibility', { p_visible: visible });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    this._setState(row);
+    return row;
+  },
+  async getLeaderboard(period) {
+    const { data, error } = await sb().rpc('get_public_leaderboard', { p_period: period, p_limit: 50 });
+    if (error) throw error;
+    return data || [];
   },
 };
 
@@ -1284,6 +1396,7 @@ const AppState = {
   pendingDomains: [],
   showEnglish:  false,  // EN/PL toggle state
   nick:            null,  // user's unique nick (user_profiles.nick); null for legacy accounts
+  engagement:      { careerExp: 0, rankingScore: 0, leaderboardVisible: false },
   isTester:        false, // gates per-question EN/PL override (user_profiles.is_tester, source of truth)
   canReportBugs:   false, // gates the "Report issue" 🚩 button (user_profiles.can_report_bugs)
   canSeeDebugInfo: false, // gates future diagnostics (user_profiles.can_see_debug_info)
@@ -1554,6 +1667,8 @@ const App = {
     // Pull cloud progress + tester profile in background — does not block UI
     SupabaseSync.pullProgress().catch(console.error);
     SupabaseSync.pullProfile().catch(console.error);
+    EngagementSync.pullMe().then(() => App.render()).catch(console.warn);
+    EngagementSync.flushPending().then(() => EngagementSync.pullMe()).then(() => App.render()).catch(console.warn);
     // Initialize EN/PL state from saved global language preference
     AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
     await new Promise(r => setTimeout(r, 800));
@@ -1831,6 +1946,8 @@ Views.home = {
     const recommended = StatsManager.getRecommendation(AppState.questions);
     const latestResult = Storage.getHistory().slice(-1)[0];
     const nick = AppState.nick || t('learner');
+    const exp = AppState.engagement.careerExp;
+    const level = Engagement.levelForExp(exp);
 
     const streakLabel = streak === 0 ? t('streak_start')
       : streak === 1 ? t('streak_one')
@@ -1873,6 +1990,7 @@ Views.home = {
           <div class="home-identity">
             <span>${BRAND_NAME}</span>
             <strong>${t('welcome_back', { nick })}</strong>
+            <small class="career-level">${t('level', { n: level })} · ${t('career_exp', { n: exp })}</small>
           </div>
           <button class="btn-settings" onclick="Views.home._openSettings()" title="${t('settings')}" aria-label="${t('settings')}">${Icons.settings()}</button>
         </div>
@@ -1941,6 +2059,7 @@ Views.home = {
             <span class="menu-btn__arrow">›</span>
           </button>
         </div>
+        ${appNav('home')}
         <div class="app-version">${APP_VERSION}</div>
       </div>`;
   },
@@ -2025,11 +2144,29 @@ Views.home = {
         </div>
         </section>
         <section class="settings-group">
+          <h3 class="settings-group__title">${t('settings_privacy')}</h3>
+          <div class="settings-row">
+            <div class="settings-row__info">
+              <span class="settings-row__icon">${Icons.ranking()}</span>
+              <div>
+                <div class="settings-row__label">${t('leaderboard_visible')}</div>
+                <div class="settings-row__desc">${t('leaderboard_desc')}</div>
+              </div>
+            </div>
+            <label class="settings-toggle" aria-label="${t('leaderboard_visible')}">
+              <input type="checkbox" id="leaderboard-toggle"
+                     ${AppState.engagement.leaderboardVisible ? 'checked' : ''}
+                     onchange="Views.home._toggleLeaderboard(this.checked)">
+              <span class="settings-toggle__slider"></span>
+            </label>
+          </div>
+          <a class="settings-action-btn settings-action-btn--link"
+             href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
+        </section>
+        <section class="settings-group">
           <h3 class="settings-group__title">${t('settings_account')}</h3>
         <button class="settings-action-btn settings-action-btn--danger"
                  onclick="Views.home._logout()">${t('sign_out')}</button>
-        <a class="settings-action-btn settings-action-btn--link"
-           href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
         </section>
       </div>`;
     document.body.appendChild(el);
@@ -2076,6 +2213,24 @@ Views.home = {
     SupabaseSync.pushProgress().catch(console.error);
     Views.home._closeSettings();
     Views.home._openSettings();
+  },
+
+  async _toggleLeaderboard(visible) {
+    const toggle = document.getElementById('leaderboard-toggle');
+    if (toggle) toggle.disabled = true;
+    try {
+      await EngagementSync.setVisibility(visible);
+      Views.home._closeSettings();
+      App.render();
+      Views.home._openSettings();
+    } catch (error) {
+      console.warn('leaderboard visibility failed:', error);
+      if (toggle) {
+        toggle.checked = !visible;
+        toggle.disabled = false;
+      }
+      alert(t('leaderboard_error'));
+    }
   },
 
   async _logout() {
@@ -2180,6 +2335,7 @@ Views['mode-select'] = {
           ${t('start')}
         </button>
         <button class="btn-gray" onclick="App.navigate('home')">${t('back')}</button>
+        ${appNav('training')}
       </div>`;
   },
 
@@ -2233,7 +2389,7 @@ Views['mode-select'] = {
       alert(t('no_questions_filter'));
       return;
     }
-    AppState.quizSession = { questions, current: 0, answers: [], mode: this._selectedMode, filters: this._filters, shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
+    AppState.quizSession = { sessionId: newSessionId(), questions, current: 0, answers: [], mode: this._selectedMode, filters: this._filters, shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
     App.navigate('quiz');
   },
 
@@ -2256,7 +2412,7 @@ Views['daily-start'] = {
       return;
     }
     const questions = QuizEngine.selectQuestions(AppState.questions, 'daily');
-    AppState.quizSession = { questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
+    AppState.quizSession = { sessionId: newSessionId(), questions, current: 0, answers: [], mode: 'daily', shuffledMap: {}, recentlyShown: [], currentAnswer: null, readinessBefore: StatsManager.getReadiness() };
     App.navigate('quiz');
   },
 };
@@ -2303,6 +2459,7 @@ Views['trial-setup'] = {
     const questions = QuizEngine.selectTrialQuestions(AppState.questions, v.questions);
     const now = Date.now();
     AppState.quizSession = {
+      sessionId: newSessionId(),
       mode: 'trial', variant: v.id, questions,
       shuffledMap: {}, answers: Array(v.questions).fill(null),
       flags: Array(v.questions).fill(false), current: 0,
@@ -2548,10 +2705,20 @@ Views.trial = {
     }).catch(console.error);
     SupabaseSync.pushProgress().catch(console.error);
 
-    AppState.trialResult = { ...result, review };
+    const award = { sessionId: s.sessionId || newSessionId(), mode: 'trial', correct, total };
+    AppState.trialResult = { ...result, review, rewardPending: true };
     AppState.quizSession = null;
     Storage.clearTrialSession();
     App.navigate('trial-result');
+    EngagementSync.award(award).then(reward => {
+      if (!AppState.trialResult) return;
+      AppState.trialResult.reward = reward;
+      AppState.trialResult.rewardPending = false;
+      if (App.currentView === 'trial-result') App.render();
+    }).catch(error => {
+      console.warn('trial reward pending retry:', error);
+      if (App.currentView === 'trial-result') App.render();
+    });
   },
 
   init() {
@@ -2640,6 +2807,7 @@ Views['trial-result'] = {
           <div class="trial-result__rating">${ratingLabel}</div>
         </div>
         <p class="trial-result__disclaimer">${t('trial_rating_disclaimer')}</p>
+        ${r.reward?.awarded_exp ? `<div class="exp-reward">${t('exp_awarded', { n: r.reward.awarded_exp })}</div>` : r.rewardPending ? `<p class="reward-pending">${t('reward_pending')}</p>` : ''}
         <div class="trial-result__time">${t('trial_time_used')}: <strong>${fmtHMS(usedSec)}</strong> ${t('trial_time_of')} ${fmtHMS(r.durationSec)}</div>
         ${ecoBars ? `<div class="stats-card"><h3>${t('tab_ecoDomain')}</h3>${ecoBars}</div>` : ''}
         ${domainBars ? `<div class="stats-card"><h3>${t('trial_domains_title')}</h3>${domainBars}</div>` : ''}
@@ -3008,9 +3176,19 @@ Views.quiz = {
     SupabaseSync.saveQuizSession({ mode: session.mode, correct, total, percent, domainResults, breakdowns }).catch(console.error);
     SupabaseSync.pushProgress().catch(console.error);
 
-    AppState.lastSummary = { correct, total, percent, bestStreak, weakestDomain, weakestSegment, streakExtended, mode: session.mode, readinessAfter, readinessDelta };
+    const award = { sessionId: session.sessionId || newSessionId(), mode: session.mode, correct, total };
+    AppState.lastSummary = { correct, total, percent, bestStreak, weakestDomain, weakestSegment, streakExtended, mode: session.mode, readinessAfter, readinessDelta, rewardPending: true };
     AppState.quizSession = null;
     App.navigate('summary');
+    EngagementSync.award(award).then(reward => {
+      if (!AppState.lastSummary) return;
+      AppState.lastSummary.reward = reward;
+      AppState.lastSummary.rewardPending = false;
+      if (App.currentView === 'summary') App.render();
+    }).catch(error => {
+      console.warn('quiz reward pending retry:', error);
+      if (App.currentView === 'summary') App.render();
+    });
   },
 
   init() {},
@@ -3137,6 +3315,7 @@ Views.summary = {
           ${s.readinessDelta !== null ? `<small>${t('readiness_delta', { n: s.readinessDelta > 0 ? '+' + s.readinessDelta : s.readinessDelta })}</small>` : ''}
           <p>${t('readiness_disclaimer')}</p>
         </div>
+        ${s.reward?.awarded_exp ? `<div class="exp-reward">${t('exp_awarded', { n: s.reward.awarded_exp })}</div>` : s.rewardPending ? `<p class="reward-pending">${t('reward_pending')}</p>` : ''}
         <div class="summary__details">
           <div class="summary__detail">
             <span>${t('best_streak')}</span>
@@ -3181,6 +3360,88 @@ Views.summary = {
     const mode = AppState.lastSummary?.mode;
     if (mode === 'daily') App.navigate('daily-start');
     else App.navigate('mode-select');
+  },
+};
+
+// ==================== RANKING VIEW ====================
+Views.ranking = {
+  _period: 'week',
+  _rows: [],
+  _loadedPeriod: null,
+  _loading: false,
+  _error: false,
+
+  render() {
+    const visible = AppState.engagement.leaderboardVisible;
+    const tabs = ['week', 'month', 'all'].map(period => `
+      <button class="${this._period === period ? 'selected' : ''}" onclick="Views.ranking._setPeriod('${period}')">${t('leaderboard_' + period)}</button>`).join('');
+    const rows = this._rows.map(item => `
+      <div class="leaderboard-row ${item.nick === AppState.nick ? 'is-me' : ''}">
+        <strong>#${item.rank}</strong>
+        <span>${item.nick}</span>
+        <b>${item.score}</b>
+      </div>`).join('');
+    const content = this._loading
+      ? `<p class="leaderboard-state">${t('leaderboard_loading')}</p>`
+      : this._error
+        ? `<p class="leaderboard-state leaderboard-state--error">${t('leaderboard_unavailable')}</p>`
+        : rows || `<p class="leaderboard-state">${t('leaderboard_empty')}</p>`;
+
+    return `
+      <div class="screen ranking">
+        <h1>${t('leaderboard_title')}</h1>
+        ${visible ? `
+          <div class="leaderboard-tabs">${tabs}</div>
+          <section class="leaderboard-table">
+            <div class="leaderboard-head"><span>${t('leaderboard_position')}</span><span>Nick</span><span>${t('leaderboard_score')}</span></div>
+            ${content}
+          </section>` : `
+          <section class="leaderboard-private">
+            <span>${Icons.ranking()}</span>
+            <h2>${t('leaderboard_private')}</h2>
+            <p>${t('leaderboard_private_desc')}</p>
+            <button class="btn-primary" onclick="Views.ranking._join()">${t('leaderboard_join')}</button>
+          </section>`}
+        ${appNav('ranking')}
+      </div>`;
+  },
+
+  init() {
+    if (AppState.engagement.leaderboardVisible && this._loadedPeriod !== this._period && !this._loading) this._load();
+  },
+
+  async _join() {
+    try {
+      await EngagementSync.setVisibility(true);
+      this._loadedPeriod = null;
+      App.render();
+    } catch (error) {
+      console.warn('leaderboard join failed:', error);
+      alert(t('leaderboard_error'));
+    }
+  },
+
+  _setPeriod(period) {
+    this._period = period;
+    this._loadedPeriod = null;
+    App.render();
+  },
+
+  async _load() {
+    this._loading = true;
+    App.render();
+    try {
+      this._rows = await EngagementSync.getLeaderboard(this._period);
+      this._loadedPeriod = this._period;
+      this._error = false;
+    } catch (error) {
+      console.warn('leaderboard loading failed:', error);
+      this._loadedPeriod = this._period;
+      this._error = true;
+    } finally {
+      this._loading = false;
+      App.render();
+    }
   },
 };
 
@@ -3304,6 +3565,7 @@ Views.stats = {
           <div class="badges-grid">${badgeItems}</div>
         </div>
         <button class="btn-gray" onclick="App.navigate('home')">${t('back')}</button>
+        ${appNav('stats')}
       </div>`;
   },
 
