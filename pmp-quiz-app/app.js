@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-8929e8ab';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-47911664';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
