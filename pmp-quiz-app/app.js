@@ -2033,6 +2033,10 @@ const App = {
     ThemeManager.init();
     // Apply saved language before the first paint so the loading/login screens are localized too
     AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
+    if (location.hash === '#/beta') {
+      this.navigate('beta');
+      return;
+    }
     this.navigate('loading');
     const { data: { session } } = await sb().auth.getSession();
     if (!session) {
@@ -2155,6 +2159,127 @@ const App = {
 
     this.navigate('home');
     SessionGuard.startHeartbeat();
+  },
+};
+
+// ==================== PUBLIC BETA LANDING VIEW ====================
+Views.beta = {
+  render() {
+    return `
+      <div class="screen beta-screen">
+        <header class="beta-header">
+          <div class="beta-brand">
+            ${Icons.mark()}
+            <div>
+              <p class="home-brand">PM Academy</p>
+              <h1>Beta dla kandydatow PMP</h1>
+            </div>
+          </div>
+          <a class="beta-login-link" href="./">${t('sign_in')}</a>
+        </header>
+
+        <main class="beta-main">
+          <section class="beta-intro">
+            <p class="card-eyebrow">Zamknieta beta</p>
+            <h2>Przetestuj aplikacje do przygotowania do egzaminu PMP</h2>
+            <p>
+              Szukam osob, ktore realnie przygotowuja sie do PMP i chca sprawdzic
+              quizy, Trial Exam, trening adaptacyjny, statystyki postepu oraz tryb PL/EN.
+            </p>
+            <div class="beta-points" aria-label="Zakres bety">
+              <span>Limitowane kody</span>
+              <span>Dostep testowy</span>
+              <span>Feedback po quizach</span>
+            </div>
+          </section>
+
+          <section class="beta-form-panel">
+            <h2>Zglos dostep testowy</h2>
+            <p>Po akceptacji wyslemy jednorazowy kod rejestracyjny na podany email.</p>
+            <div class="beta-form">
+              <input type="email" id="beta-email" placeholder="Email" autocomplete="email" inputmode="email" spellcheck="false" autocapitalize="none">
+              <input type="text" id="beta-name" placeholder="Imie lub nick" autocomplete="name" maxlength="120">
+              <select id="beta-stage" aria-label="Etap przygotowan do PMP">
+                <option value="">Etap przygotowan do PMP</option>
+                <option value="zaczynam przygotowania">Zaczynam przygotowania</option>
+                <option value="ucze sie aktywnie">Ucze sie aktywnie</option>
+                <option value="egzamin w najblizszych tygodniach">Egzamin w najblizszych tygodniach</option>
+                <option value="mam juz PMP, moge dac feedback">Mam juz PMP, moge dac feedback</option>
+              </select>
+              <input type="url" id="beta-linkedin" placeholder="Profil LinkedIn (opcjonalnie)" autocomplete="url" spellcheck="false" autocapitalize="none">
+              <input type="text" id="beta-company" name="company" class="beta-honeypot" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <label class="beta-consent">
+                <input type="checkbox" id="beta-consent">
+                <span>Zgadzam sie na kontakt mailowy w sprawie bety PM Academy.</span>
+              </label>
+              <div id="beta-msg" class="login-msg hidden"></div>
+              <button class="btn-primary" id="beta-submit" onclick="Views.beta._submit()">Popros o kod beta</button>
+            </div>
+          </section>
+        </main>
+      </div>`;
+  },
+
+  async _submit() {
+    const btn = document.getElementById('beta-submit');
+    const email = document.getElementById('beta-email')?.value.trim();
+    const name = document.getElementById('beta-name')?.value.trim();
+    const pmpStage = document.getElementById('beta-stage')?.value;
+    const linkedinUrl = document.getElementById('beta-linkedin')?.value.trim();
+    const consent = document.getElementById('beta-consent')?.checked === true;
+    const honeypot = document.getElementById('beta-company')?.value || '';
+
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      this._msg('Podaj prawidlowy adres email.', false);
+      return;
+    }
+    if (!consent) {
+      this._msg('Zgoda na kontakt w sprawie bety jest wymagana.', false);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Wysylam...';
+    this._msg('Zapisuje zgloszenie...', true);
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-beta-application`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON,
+          'Authorization': `Bearer ${SUPABASE_ANON}`,
+        },
+        body: JSON.stringify({
+          email,
+          name,
+          pmp_stage: pmpStage,
+          linkedin_url: linkedinUrl,
+          consent,
+          honeypot,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        this._msg(data.error || t('generic_error'), false);
+        btn.disabled = false;
+        btn.textContent = 'Popros o kod beta';
+        return;
+      }
+      this._msg('Zgloszenie zapisane. Jesli zostanie zaakceptowane, dostaniesz kod na email.', true);
+      btn.textContent = 'Zgloszenie wyslane';
+    } catch (error) {
+      this._msg(error.message || t('generic_error'), false);
+      btn.disabled = false;
+      btn.textContent = 'Popros o kod beta';
+    }
+  },
+
+  _msg(text, ok) {
+    const el = document.getElementById('beta-msg');
+    if (!el) return;
+    el.textContent = text;
+    el.className = `login-msg ${ok ? 'login-msg--ok' : 'login-msg--err'}`;
   },
 };
 

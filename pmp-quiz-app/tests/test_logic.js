@@ -1252,6 +1252,16 @@ test('privacy policy action is rendered after account actions', () => {
   assert(privacyIndex > signOutIndex, 'privacy policy action should be below account actions');
 });
 
+console.log('\nBeta landing UI:');
+test('beta landing route is public and renders an access request form', () => {
+  assert(appSource.includes("Views.beta = {"), 'beta view should exist');
+  assert(appSource.includes("location.hash === '#/beta'"), 'hash route #/beta should bypass auth');
+  assert(appSource.includes('submit-beta-application'), 'beta form should call submit-beta-application');
+  assert(appSource.includes('id="beta-email"'), 'beta form should include an email field');
+  assert(appSource.includes('id="beta-consent"'), 'beta form should include a consent checkbox');
+  assert(appSource.includes('name="company"'), 'beta form should include a bot honeypot field');
+});
+
 console.log('\nEngagement:');
 test('wrong answers never subtract career EXP and do not create negative ranking points', () => {
   assertEqual(Engagement.scoreAnswers({ correct: 7, total: 10, mode: 'quick' }), {
