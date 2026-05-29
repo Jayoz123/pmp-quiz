@@ -32,6 +32,7 @@ const requiredSnippets = [
   ['https://api.brevo.com/v3/smtp/email', 'uses the Brevo transactional email endpoint'],
   ['assigned_to_email', 'marks a beta code as assigned before registration'],
   ['assigned_application_id', 'links the assigned code to the application'],
+  ["application.status === 'sent'", 'does not resend an invitation that is already sent'],
   ['status: \'sent\'', 'marks successful applications as sent'],
   ['status: \'failed\'', 'marks failed applications as failed'],
   [".eq('used', false)", 'only assigns unused beta codes'],

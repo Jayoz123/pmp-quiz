@@ -150,6 +150,16 @@ Deno.serve(async (req) => {
   if (appErr || !application) {
     return json({ error: 'Nie znaleziono zgloszenia.' }, 404)
   }
+  if (application.status === 'sent' && application.assigned_code) {
+    return json({
+      ok: true,
+      applicationId: application.id,
+      code: application.assigned_code,
+      email: application.email.trim().toLowerCase(),
+      status: 'sent',
+      alreadySent: true,
+    })
+  }
   if (application.status === 'rejected') {
     return json({ error: 'To zgloszenie zostalo odrzucone.' }, 409)
   }
