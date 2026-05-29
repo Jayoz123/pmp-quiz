@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-7b82d980';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-53e08905';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -315,6 +315,8 @@ const I18N = {
   preliminary_diagnosis:{ pl: 'Diagnoza wstępna',               en: 'Preliminary diagnosis' },
   training_readiness: { pl: 'Gotowość treningowa',              en: 'Training readiness' },
   building_evidence_more:{ pl: 'Zbieramy wiarygodne pokrycie ECO. Do pełnej gotowości brakuje ok. {n} odpowiedzi.', en: 'Building reliable ECO coverage. About {n} answers remain for full readiness.' },
+  building_evidence_domain:{ pl: 'Zbieramy wiarygodne pokrycie ECO. Brakuje ok. {n} odpowiedzi w domenie {domain}.', en: 'Building reliable ECO coverage. About {n} answers are missing in {domain}.' },
+  building_evidence_total_and_domain:{ pl: 'Zbieramy wiarygodne pokrycie ECO. Brakuje ok. {n} odpowiedzi, w tym {domainMissing} w domenie {domain}.', en: 'Building reliable ECO coverage. About {n} answers are missing, including {domainMissing} in {domain}.' },
   biggest_gap:        { pl: 'Największa luka',                  en: 'Biggest gap' },
   coverage_gap:       { pl: 'Brak pokrycia',                    en: 'Coverage gap' },
   practice_gap:       { pl: 'Ćwicz lukę',                       en: 'Practice gap' },
@@ -329,6 +331,25 @@ const I18N = {
   ranking_private:    { pl: 'Prywatny',                         en: 'Private' },
   no_result:          { pl: 'Brak danych',                      en: 'No data' },
   progress_title:     { pl: 'Postęp',                           en: 'Progress' },
+  readiness_data_window:{ pl: 'Ostatnie 30 dni',                 en: 'Last 30 days' },
+  eco_mastery:        { pl: 'Domeny ECO',                       en: 'ECO domains' },
+  progress_over_time: { pl: 'Postęp w czasie',                  en: 'Progress over time' },
+  trend_start:        { pl: 'Start',                            en: 'Start' },
+  trend_now:          { pl: 'Teraz',                            en: 'Now' },
+  trend_change:       { pl: 'Zmiana',                           en: 'Change' },
+  train_domain:       { pl: 'Trenuj domenę',                    en: 'Train domain' },
+  strong_domain:      { pl: 'Mocna',                            en: 'Strong' },
+  steady_domain:      { pl: 'Stabilna',                         en: 'Steady' },
+  weak_domain:        { pl: 'Do poprawy',                       en: 'Needs work' },
+  low_data_domain:    { pl: 'Za mało danych',                   en: 'Low data' },
+  learning_activity:  { pl: 'Aktywność nauki',                  en: 'Learning activity' },
+  pm_academy_badges:  { pl: 'Odznaki PM Academy',               en: 'PM Academy badges' },
+  ranking_context:    { pl: 'Ranking',                          en: 'Ranking' },
+  view_ranking:       { pl: 'Zobacz ranking',                   en: 'View ranking' },
+  no_trend_data:      { pl: 'Za mało danych, aby pokazać trend.', en: 'Not enough data to show a trend.' },
+  coverage_metric:    { pl: '{answered} odp. ECO z 30 dni · cel min. {target}', en: '{answered} ECO ans. in 30 days · min target {target}' },
+  coverage_metric_met:{ pl: '{answered} odp. ECO z 30 dni · cel osiągnięty', en: '{answered} ECO ans. in 30 days · target met' },
+  missing_responses:  { pl: 'brakuje {n}',                      en: '{n} missing' },
   level:              { pl: 'Poziom {n}',                       en: 'Level {n}' },
   career_exp:         { pl: '{n} EXP',                          en: '{n} EXP' },
   nav_label:          { pl: 'Główna nawigacja',                 en: 'Main navigation' },
@@ -548,6 +569,44 @@ function t(key, vars) {
   let s = entry ? (entry[L()] ?? entry.pl) : key;
   if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
   return s;
+}
+
+function readinessEvidenceText(readiness) {
+  const progress = readiness?.progress || {};
+  const remaining = progress.remainingForReadiness ?? Math.max(0, (readiness?.required || READINESS_CONFIG.targetAnswersForReadiness) - (readiness?.answered || 0));
+  if (readiness?.state === 'calibrating') return t('calibrating_more', { n: remaining });
+  if (readiness?.state === 'ready') return t('readiness_disclaimer');
+
+  const gap = progress.primaryCoverageGap;
+  if (gap && progress.totalRemaining > 0) {
+    return t('building_evidence_total_and_domain', {
+      n: remaining,
+      domainMissing: gap.missing,
+      domain: tEcoDomain(gap.key),
+    });
+  }
+  if (gap) {
+    return t('building_evidence_domain', {
+      n: gap.missing,
+      domain: tEcoDomain(gap.key),
+    });
+  }
+  return t('building_evidence_more', { n: remaining });
+}
+
+function readinessCoverageText(readiness) {
+  const answered = readiness?.answered || 0;
+  const target = READINESS_CONFIG.targetAnswersForReadiness;
+  const key = answered >= target ? 'coverage_metric_met' : 'coverage_metric';
+  return t(key, { answered, target });
+}
+
+function readinessGapMeta(readiness, gap, gapTypeLabel) {
+  if (!gap) return '';
+  const base = `${gapTypeLabel} · ${gap.total} ${t('responses')}`;
+  if (!readiness?.coverageGap || gap.key !== readiness.coverageGap.key) return base;
+  const missing = Math.max(0, READINESS_CONFIG.minimumPerEcoDomain - (gap.total || 0));
+  return missing ? `${base} · ${t('missing_responses', { n: missing })}` : base;
 }
 
 // ==================== STORAGE (localStorage cache) ====================
@@ -1511,6 +1570,38 @@ const StatsManager = {
       breakdowns: QuizEngine.buildBreakdowns(records),
     };
   },
+  calculateReadinessProgress(answered, eco, state) {
+    const totalTarget = READINESS_CONFIG.targetAnswersForReadiness;
+    const diagnosticRemaining = Math.max(0, READINESS_CONFIG.minimumAnswersForDiagnostic - answered);
+    const totalRemaining = Math.max(0, totalTarget - answered);
+    const coverageShortfalls = ECO_DOMAIN_KEYS.map(key => {
+      const item = eco.find(domain => domain.key === key) || { key, total: 0 };
+      const domainAnswered = item.total || 0;
+      const missing = Math.max(0, READINESS_CONFIG.minimumPerEcoDomain - domainAnswered);
+      return { key, answered: domainAnswered, missing };
+    }).filter(item => item.missing > 0);
+    const coverageRemaining = coverageShortfalls.reduce((sum, item) => sum + item.missing, 0);
+    const primaryCoverageGap = coverageShortfalls
+      .slice()
+      .sort((a, b) => a.answered - b.answered || ECO_DOMAIN_KEYS.indexOf(a.key) - ECO_DOMAIN_KEYS.indexOf(b.key))[0] || null;
+    const remainingForReadiness = state === 'ready'
+      ? 0
+      : state === 'calibrating'
+        ? diagnosticRemaining
+        : Math.max(totalRemaining, coverageRemaining);
+
+    return {
+      totalTarget,
+      rawAnswered: answered,
+      displayAnswered: Math.min(answered, totalTarget),
+      diagnosticRemaining,
+      totalRemaining,
+      coverageShortfalls,
+      coverageRemaining,
+      primaryCoverageGap,
+      remainingForReadiness,
+    };
+  },
   calculateReadiness(recent) {
     const answered = recent.reduce((sum, result) => sum + (result.total || 0), 0);
     if (answered < READINESS_CONFIG.minimumAnswersForDiagnostic) {
@@ -1540,16 +1631,47 @@ const StatsManager = {
     const state = answered >= READINESS_CONFIG.minimumAnswersForReadiness && !coverageGap
       ? 'ready'
       : 'building_evidence';
+    const progress = this.calculateReadinessProgress(answered, eco, state);
     return {
       state, score, accuracy, coverageFactor, rawMastery, weakest, coverageGap, answered,
       required: state === 'building_evidence' ? READINESS_CONFIG.targetAnswersForReadiness : READINESS_CONFIG.minimumAnswersForDiagnostic,
       domains: eco,
+      progress,
     };
   },
   getReadiness(extraResults = []) {
     const recent = [...(Array.isArray(extraResults) ? extraResults : []), ...this.getRecentClassifiedHistory()]
       .filter(result => (result.breakdowns?.ecoDomain || []).length);
     return this.calculateReadiness(recent);
+  },
+  getReadinessTrend(days = 30) {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+    const classified = Storage.getHistory()
+      .filter(result => (result.breakdowns?.ecoDomain || []).length)
+      .filter(result => new Date(result.date) >= cutoff)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    const points = classified.map((result, index) => {
+      const readiness = this.calculateReadiness(classified.slice(0, index + 1));
+      const score = readiness.state === 'calibrating' ? (readiness.accuracy || result.percent || 0) : readiness.score;
+      return { date: result.date, score: Math.max(0, Math.min(100, Math.round(score || 0))) };
+    }).filter(point => Number.isFinite(point.score));
+    return {
+      points,
+      start: points.length ? points[0].score : null,
+      current: points.length ? points[points.length - 1].score : null,
+      delta: points.length > 1 ? points[points.length - 1].score - points[0].score : null,
+    };
+  },
+  getEcoReadinessCards(readiness) {
+    const domains = Array.isArray(readiness?.domains) ? readiness.domains : [];
+    return ECO_DOMAIN_KEYS.map(key => {
+      const item = domains.find(domain => domain.key === key) || { key, correct: 0, total: 0, percent: 0 };
+      const status = item.total < READINESS_CONFIG.minimumPerEcoDomain ? 'low_data'
+        : item.percent >= 80 ? 'strong'
+        : item.percent < 70 ? 'weak'
+        : 'steady';
+      return { ...item, status };
+    });
   },
   getReadinessWithAdditionalAnswers(answerRecords) {
     const records = Array.isArray(answerRecords) ? answerRecords : [];
@@ -1571,10 +1693,10 @@ const StatsManager = {
     const canTrain = item => hasQuestions && QuizEngine.countAvailable(questions, 'quick', filterForSegment('ecoDomain', item.key)) >= 10;
     const weakEnough = readiness.weakest && readiness.weakest.total >= READINESS_CONFIG.minimumPerEcoDomain && canTrain(readiness.weakest);
     const gapTrainable = readiness.coverageGap && canTrain(readiness.coverageGap);
-    const recommended = weakEnough
-      ? { dimension: 'ecoDomain', key: readiness.weakest.key, total: readiness.weakest.total, percent: readiness.weakest.percent, filters: filterForSegment('ecoDomain', readiness.weakest.key) }
-      : gapTrainable
-        ? { dimension: 'ecoDomain', key: readiness.coverageGap.key, total: readiness.coverageGap.total, percent: readiness.coverageGap.percent, filters: filterForSegment('ecoDomain', readiness.coverageGap.key), reason: 'coverage' }
+    const recommended = gapTrainable
+      ? { dimension: 'ecoDomain', key: readiness.coverageGap.key, total: readiness.coverageGap.total, percent: readiness.coverageGap.percent, filters: filterForSegment('ecoDomain', readiness.coverageGap.key), reason: 'coverage' }
+      : weakEnough
+        ? { dimension: 'ecoDomain', key: readiness.weakest.key, total: readiness.weakest.total, percent: readiness.weakest.percent, filters: filterForSegment('ecoDomain', readiness.weakest.key) }
         : this.getRecommendation(questions);
     return {
       readiness,
@@ -2315,7 +2437,7 @@ Views.home = {
     }).join('');
 
     const syncLabel = { idle: '', syncing: '⟳ sync…', ok: '', error: '⚠ offline' }[AppState.syncStatus] || '';
-    const remaining = Math.max(0, (readiness.required || READINESS_CONFIG.targetAnswersForReadiness) - readiness.answered);
+    const readinessScore = readiness.state === 'calibrating' ? null : Math.max(0, Math.min(100, readiness.score || 0));
     const planIsDaily = !dailyDone;
     const planIsAdaptive = dailyDone && !!recommended;
     const planLabel = planIsDaily ? t('daily_challenge') : planIsAdaptive ? t('adaptive_training') : t('quick_quiz');
@@ -2325,17 +2447,16 @@ Views.home = {
       : planIsAdaptive
         ? `Views['mode-select']._applyTraining('${recommended.dimension}', '${recommended.key}')`
         : "App.navigate('mode-select')";
-    const readinessStateLabel = readiness.state === 'ready' ? `${readiness.score}%` : insight.evidenceLabel;
-    const readinessTitle = readiness.state === 'ready' ? `${readiness.score}%` : insight.evidenceLabel;
-    const readinessText = readiness.state === 'calibrating'
-      ? t('calibrating_more', { n: remaining })
-      : readiness.state === 'ready'
-        ? t('readiness_disclaimer')
-        : t('building_evidence_more', { n: remaining });
-    const gaugeScore = readiness.state === 'ready' ? readiness.score : Math.max(10, Math.min(28, readiness.score || 14));
+    const readinessStateLabel = readiness.state === 'ready' ? t('training_readiness') : insight.evidenceLabel;
+    const readinessTitle = readiness.state === 'calibrating' ? insight.evidenceLabel : `${readinessScore}%`;
+    const readinessText = readinessEvidenceText(readiness);
+    const gaugeScore = readiness.state === 'calibrating'
+      ? Math.max(10, Math.min(28, readiness.score || 14))
+      : Math.max(8, readinessScore);
     const gap = readiness.coverageGap || readiness.weakest;
     const gapLabel = insight.primaryGapLabel || (gap ? tEcoDomain(gap.key) : null);
     const gapTypeLabel = readiness.coverageGap ? t('coverage_gap') : t('weakest_area');
+    const gapMeta = readinessGapMeta(readiness, gap, gapTypeLabel);
     const gapCta = recommended && readiness.state !== 'calibrating'
       ? `<button class="btn-primary readiness-gap__cta" onclick="Views['mode-select']._applyTraining('${recommended.dimension}', '${recommended.key}')">${t('practice_gap')}</button>`
       : '';
@@ -2371,7 +2492,7 @@ Views.home = {
               <p>${readinessText}</p>
             </div>
             <div class="readiness-ring" style="--score:${gaugeScore}" aria-label="${readinessStateLabel}">
-              <span>${readiness.state === 'ready' ? `${readiness.score}%` : Icons.shield()}</span>
+              <span>${readiness.state === 'calibrating' ? Icons.shield() : `${readinessScore}%`}</span>
             </div>
           </div>
           ${gapLabel ? `
@@ -2379,7 +2500,7 @@ Views.home = {
             <div>
               <span>${t('biggest_gap')}</span>
               <strong>${gapLabel}</strong>
-              <small>${gapTypeLabel}${gap?.total !== undefined ? ` · ${gap.total} ${t('responses')}` : ''}</small>
+              <small>${gapMeta}</small>
             </div>
             ${gapCta}
           </div>` : ''}
@@ -3718,6 +3839,23 @@ function launchConfetti() {
 }
 
 // ==================== BADGE POPUP ====================
+function badgeIcon(id) {
+  const icons = {
+    first: '<circle cx="12" cy="12" r="7"/><path d="M12 8v8M8 12h8"/>',
+    week: '<path d="M12 21c3.6 0 6-2.5 6-5.8 0-2.3-1.3-4.4-3.9-6.5.1 1.7-.6 3-1.8 3.9.2-2.6-.9-4.6-3.2-6 .3 2.9-2.6 4.7-2.6 8.4C6.5 18.5 8.9 21 12 21z"/>',
+    month: '<path d="M12 3 20 7v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/><path d="m9 12 2 2 4-5"/>',
+    hundred: '<path d="M7 6h11v12H7z"/><path d="M4 9h3v9h11"/>',
+    fivehun: '<path d="m12 4 2.3 4.7 5.2.8-3.8 3.7.9 5.2L12 16l-4.6 2.4.9-5.2-3.8-3.7 5.2-.8z"/>',
+    perfect: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+    ready: '<path d="M12 3 20 7v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/><path d="M8.5 12.5 11 15l4.5-6"/>',
+    trial_first: '<rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/>',
+    trial_marathon: '<circle cx="12" cy="13" r="7"/><path d="M12 13V9M12 13l3 2M9 2h6"/>',
+    trial_target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="m15 9 4-4M18 5h1v1"/>',
+    trial_clock: '<circle cx="12" cy="13" r="8"/><path d="M12 13V8M12 13l4 2M9 2h6"/>',
+  };
+  return `<svg class="badge-mark__icon" aria-hidden="true" viewBox="0 0 24 24">${icons[id] || icons.first}</svg>`;
+}
+
 function showBadgePopup(badge, isInfo = false) {
   const popup = document.getElementById('badge-popup');
 
@@ -3765,7 +3903,7 @@ function showBadgePopup(badge, isInfo = false) {
   }
 
   popup.innerHTML = `
-    <div class="badge-popup__emoji">${badge.emoji}</div>
+    <div class="badge-mark badge-mark--popup badge-mark--${badge.id}">${badgeIcon(badge.id)}</div>
     <div class="badge-popup__text">
       <strong>${title}</strong>
       <span>${desc}</span>
@@ -3934,7 +4072,7 @@ Views.ranking = {
 };
 
 // ==================== STATS VIEW ====================
-Views.stats = {
+const StatsViewBase = {
   _activeBreakdown: 'ecoDomain',
 
   render() {
@@ -4190,6 +4328,265 @@ Views.stats = {
         el.style.width = el.dataset.target + '%';
       });
     }, 100);
+  },
+};
+
+Views.stats = {
+  ...StatsViewBase,
+
+  render() {
+    const insight = StatsManager.getReadinessInsight(AppState.questions);
+    const readiness = insight.readiness;
+    const recommended = insight.recommended;
+    const trend = StatsManager.getReadinessTrend();
+    const ecoCards = StatsManager.getEcoReadinessCards(readiness);
+    const avg3  = StatsManager.getAvg(3);
+    const avg7  = StatsManager.getAvg(7);
+    const avg30 = StatsManager.getAvg(30);
+    const totals = StatsManager.getTotals();
+    const perDomain = StatsManager.getPerDomain(AppState.questions);
+    const breakdown = StatsManager.getBreakdown(this._activeBreakdown, AppState.questions);
+    const unlocked = Storage.getUnlockedBadges();
+
+    const now = new Date();
+    const dayName = t('day_' + now.getDay());
+    const monthName = t('month_' + now.getMonth());
+    const fullDate = `${now.getDate()} ${monthName} ${now.getFullYear()}, ${dayName}`;
+    const monthGrid = this._renderMonthGrid(now.getFullYear(), now.getMonth());
+    const avgVal = value => value !== null ? `${value}%` : '—';
+    const pctVal = value => value !== null && value !== undefined ? `${value}%` : '—';
+    const readinessScore = readiness.state === 'calibrating' ? 0 : Math.max(0, Math.min(100, readiness.score || 0));
+    const readinessHeadline = readiness.state === 'calibrating' ? t('calibrating') : `${readinessScore}%`;
+    const readinessText = readinessEvidenceText(readiness);
+    const coverageText = readinessCoverageText(readiness);
+    const gaugeScore = readiness.state === 'calibrating' ? Math.max(8, Math.min(24, readinessScore || 12)) : readinessScore;
+    const gap = readiness.coverageGap || readiness.weakest;
+    const gapLabel = insight.primaryGapLabel || (gap ? tEcoDomain(gap.key) : null);
+    const gapTypeLabel = readiness.coverageGap ? t('coverage_gap') : t('weakest_area');
+    const gapMeta = readinessGapMeta(readiness, gap, gapTypeLabel);
+    const gapCta = recommended
+      ? `<button class="btn-primary stats-gap-card__cta" onclick="Views['mode-select']._applyTraining('${recommended.dimension}', '${recommended.key}')">${t('practice_gap')}</button>`
+      : '';
+
+    const domainBars = perDomain.map(domain => `
+      <div class="domain-bar">
+        <span class="domain-bar__name">${tDomain(domain.domain)}</span>
+        <div class="domain-bar__track">
+          <div class="domain-bar__fill" style="width:0%" data-target="${domain.percent ?? 0}"></div>
+        </div>
+        <span class="domain-bar__pct">${domain.percent !== null ? domain.percent + '%' : '—'}</span>
+      </div>`).join('');
+    const breakdownRows = breakdown.map(item => `
+      <div class="breakdown-row">
+        <span class="breakdown-row__name">${labelForSegment(this._activeBreakdown, item.key)}</span>
+        <div class="domain-bar__track"><div class="domain-bar__fill" style="width:0%" data-target="${item.percent ?? 0}"></div></div>
+        <span class="breakdown-row__pct">${item.percent !== null ? item.percent + '%' : t('no_data')}</span>
+        <span class="breakdown-row__count">${item.total ? item.total + ' ' + t('responses') : ''}</span>
+      </div>`).join('');
+    const breakdownTabs = ['ecoDomain', 'approach', 'domain', 'qtype', 'difficulty'].map(dimension => `
+      <button class="stats-tab ${this._activeBreakdown === dimension ? 'selected' : ''}"
+              onclick="Views.stats._setBreakdown('${dimension}')">${t('tab_' + dimension)}</button>`).join('');
+    const badgeItems = BADGES_DEF.map(badge => `
+      <button type="button" class="badge-item ${unlocked.includes(badge.id) ? '' : 'locked'}" onclick="Views.stats._showBadgeInfo('${badge.id}')">
+        <span class="badge-mark badge-mark--${badge.id}">${badgeIcon(badge.id)}</span>
+        <span class="badge-item__name">${AppState.showEnglish ? (badge.name_en || badge.name) : badge.name}</span>
+      </button>`).join('');
+    const ecoCardsHtml = ecoCards.map(item => `
+      <button type="button" class="eco-card eco-card--${item.status}" onclick="Views['mode-select']._applyTraining('ecoDomain', '${item.key}')" aria-label="${t('train_domain')}: ${tEcoDomain(item.key)}">
+        <div class="eco-card__top">
+          <strong>${tEcoDomain(item.key)}</strong>
+          <span>${pctVal(item.total ? item.percent : null)}</span>
+        </div>
+        <div class="eco-card__bar"><span style="width:${item.total ? item.percent : 0}%"></span></div>
+        <div class="eco-card__meta">
+          <span>${this._ecoStatusLabel(item.status)}</span>
+          <small>${item.total} ${t('responses')}</small>
+        </div>
+      </button>`).join('');
+    const rankingMeta = AppState.engagement.leaderboardVisible ? t('ranking_points') : t('ranking_private');
+    const rankingDesc = AppState.engagement.leaderboardVisible
+      ? `${AppState.engagement.rankingScore || 0} ${t('leaderboard_score').toLowerCase()}`
+      : t('leaderboard_private_desc');
+
+    return `
+      <div class="screen stats">
+        <header class="stats-header">
+          <div>
+            <h1>${t('progress_title')}</h1>
+            <p>${t('readiness_data_window')}</p>
+          </div>
+          <span>${coverageText}</span>
+        </header>
+
+        <section class="stats-hero">
+          <div class="stats-hero__main">
+            <p class="card-eyebrow">${t('readiness_title')}</p>
+            <div class="stats-hero__score">${readinessHeadline}</div>
+            <p>${readinessText}</p>
+          </div>
+          <div class="stats-hero__ring" style="--score:${gaugeScore}" aria-label="${t('readiness_title')}: ${readinessHeadline}">
+            <span>${readiness.state === 'calibrating' ? Icons.shield() : `${readinessScore}%`}</span>
+          </div>
+          <div class="stats-hero__coverage">
+            <span>${coverageText}</span>
+            <small>${t('readiness_disclaimer')}</small>
+          </div>
+        </section>
+
+        <section class="stats-card eco-readiness">
+          <div class="stats-section-head">
+            <h3>${t('eco_mastery')}</h3>
+            <span>${t('train_domain')}</span>
+          </div>
+          <div class="eco-readiness-grid">${ecoCardsHtml}</div>
+        </section>
+
+        <section class="stats-card trend-card">
+          <div class="stats-section-head">
+            <h3>${t('progress_over_time')}</h3>
+            <span>${t('readiness_data_window')}</span>
+          </div>
+          ${this._renderTrendChart(trend)}
+          <div class="trend-stats">
+            ${this._trendStat(t('trend_start'), pctVal(trend.start))}
+            ${this._trendStat(t('trend_now'), pctVal(trend.current))}
+            ${this._trendStat(t('trend_change'), this._formatTrendDelta(trend.delta))}
+          </div>
+        </section>
+
+        ${gapLabel ? `
+        <section class="stats-gap-card">
+          <div>
+            <span>${t('biggest_gap')}</span>
+            <strong>${gapLabel}</strong>
+            <small>${gapMeta}</small>
+          </div>
+          ${gapCta}
+        </section>` : ''}
+
+        <button class="stats-card ranking-context" type="button" onclick="App.navigate('ranking')">
+          <span class="ranking-context__icon">${Icons.ranking()}</span>
+          <span>
+            <small>${t('ranking_context')}</small>
+            <strong>${rankingMeta}</strong>
+            <em>${rankingDesc}</em>
+          </span>
+          <b>${t('view_ranking')}</b>
+        </button>
+
+        <div class="stats-card stats-card--activity" onclick="Views.stats._openFullCalendar()">
+          <div class="stats-section-head">
+            <h3>${t('learning_activity')}</h3>
+            <span>${fullDate}</span>
+          </div>
+          <div class="calendar-grid">
+            ${this._renderDayLabels()}
+            ${monthGrid}
+          </div>
+        </div>
+
+        <div class="stats-card">
+          <div class="stats-section-head">
+            <h3>${t('pm_academy_badges')}</h3>
+            <span>${unlocked.length}/${BADGES_DEF.length}</span>
+          </div>
+          <div class="badges-grid">${badgeItems}</div>
+        </div>
+
+        <div class="stats-card stats-card--details">
+          <h3>${t('avg_correct')}</h3>
+          <div class="avg-row">
+            <div class="avg-item">
+              <div class="avg-item__val">${avgVal(avg3)}</div>
+              <div class="avg-item__label">${t('d3')}</div>
+            </div>
+            <div class="avg-item">
+              <div class="avg-item__val">${avgVal(avg7)}</div>
+              <div class="avg-item__label">${t('d7')}</div>
+            </div>
+            <div class="avg-item">
+              <div class="avg-item__val">${avgVal(avg30)}</div>
+              <div class="avg-item__label">${t('d30')}</div>
+            </div>
+          </div>
+          <div class="totals totals--compact">
+            <div class="total-item">
+              <div class="total-item__val">${totals.quizzes}</div>
+              <div class="total-item__label">${t('quizzes')}</div>
+            </div>
+            <div class="total-item">
+              <div class="total-item__val">${totals.answered}</div>
+              <div class="total-item__label">${t('questions')}</div>
+            </div>
+          </div>
+        </div>
+
+        ${perDomain.length ? `
+        <div class="stats-card stats-card--details">
+          <h3>${t('per_domain')}</h3>
+          ${domainBars}
+        </div>` : ''}
+
+        <div class="stats-card stats-card--analysis">
+          <h3>${t('preparation_analysis')}</h3>
+          <div class="stats-tabs">${breakdownTabs}</div>
+          <p class="stats-note">${t('data_since_update')}</p>
+          <div class="breakdown-list">${breakdownRows}</div>
+        </div>
+        <button class="btn-gray" onclick="App.navigate('home')">${t('back')}</button>
+        ${appNav('stats')}
+      </div>`;
+  },
+
+  _ecoStatusLabel(status) {
+    return {
+      strong: t('strong_domain'),
+      steady: t('steady_domain'),
+      weak: t('weak_domain'),
+      low_data: t('low_data_domain'),
+    }[status] || t('no_data');
+  },
+
+  _formatTrendDelta(delta) {
+    if (delta === null || delta === undefined) return '—';
+    return `${delta > 0 ? '+' : ''}${delta} pkt`;
+  },
+
+  _trendStat(label, value) {
+    return `<div><span>${label}</span><strong>${value}</strong></div>`;
+  },
+
+  _renderTrendChart(trend) {
+    const points = Array.isArray(trend?.points) ? trend.points : [];
+    if (points.length < 2) return `<p class="trend-empty">${t('no_trend_data')}</p>`;
+    const plot = points.map((point, index) => {
+      const x = 6 + (index * 88 / Math.max(1, points.length - 1));
+      const y = 8 + ((100 - point.score) * 42 / 100);
+      return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
+    });
+    const linePath = plot.map((point, index) => `${index ? 'L' : 'M'}${point.x} ${point.y}`).join(' ');
+    const areaPath = `${linePath} L${plot[plot.length - 1].x} 54 L${plot[0].x} 54 Z`;
+    return `
+      <svg class="trend-chart" viewBox="0 0 100 60" role="img" aria-label="${t('progress_over_time')}">
+        <path class="trend-chart__grid" d="M6 8H94M6 29H94M6 50H94"/>
+        <path class="trend-chart__area" d="${areaPath}"/>
+        <path class="trend-chart__line" d="${linePath}"/>
+        ${plot.map(point => `<circle class="trend-chart__dot" cx="${point.x}" cy="${point.y}" r="2.2"/>`).join('')}
+      </svg>`;
+  },
+
+  _renderMonthGrid(year, month) {
+    const days = StreakManager.getMonthData(year, month);
+    return days.map(day => {
+      if (day.type === 'padding') return `<div class="calendar-cell padding"></div>`;
+      const hasActivity = day.status === 'done' || day.status === 'activity';
+      const onClick = hasActivity ? `onclick="event.stopPropagation(); Views.stats._showDayDetails('${day.date}', this)"` : '';
+      return `<button type="button" class="calendar-cell calendar-cell--${day.status} ${day.isToday ? 'today' : ''}"
+                   title="${day.date}" ${onClick} aria-label="${day.date}">
+                <span class="calendar-cell__num">${day.dayNum}</span>
+                <span class="calendar-cell__marker"></span>
+              </button>`;
+    }).join('');
   },
 };
 

@@ -459,6 +459,38 @@ const StatsManager = {
       breakdowns: QuizEngine.buildBreakdowns(records),
     };
   },
+  calculateReadinessProgress(answered, eco, state) {
+    const totalTarget = READINESS_CONFIG.targetAnswersForReadiness;
+    const diagnosticRemaining = Math.max(0, READINESS_CONFIG.minimumAnswersForDiagnostic - answered);
+    const totalRemaining = Math.max(0, totalTarget - answered);
+    const coverageShortfalls = ECO_DOMAIN_KEYS.map(key => {
+      const item = eco.find(domain => domain.key === key) || { key, total: 0 };
+      const domainAnswered = item.total || 0;
+      const missing = Math.max(0, READINESS_CONFIG.minimumPerEcoDomain - domainAnswered);
+      return { key, answered: domainAnswered, missing };
+    }).filter(item => item.missing > 0);
+    const coverageRemaining = coverageShortfalls.reduce((sum, item) => sum + item.missing, 0);
+    const primaryCoverageGap = coverageShortfalls
+      .slice()
+      .sort((a, b) => a.answered - b.answered || ECO_DOMAIN_KEYS.indexOf(a.key) - ECO_DOMAIN_KEYS.indexOf(b.key))[0] || null;
+    const remainingForReadiness = state === 'ready'
+      ? 0
+      : state === 'calibrating'
+        ? diagnosticRemaining
+        : Math.max(totalRemaining, coverageRemaining);
+
+    return {
+      totalTarget,
+      rawAnswered: answered,
+      displayAnswered: Math.min(answered, totalTarget),
+      diagnosticRemaining,
+      totalRemaining,
+      coverageShortfalls,
+      coverageRemaining,
+      primaryCoverageGap,
+      remainingForReadiness,
+    };
+  },
   calculateReadiness(recent) {
     const answered = recent.reduce((sum, result) => sum + (result.total || 0), 0);
     if (answered < READINESS_CONFIG.minimumAnswersForDiagnostic) {
@@ -488,16 +520,47 @@ const StatsManager = {
     const state = answered >= READINESS_CONFIG.minimumAnswersForReadiness && !coverageGap
       ? 'ready'
       : 'building_evidence';
+    const progress = this.calculateReadinessProgress(answered, eco, state);
     return {
       state, score, accuracy, coverageFactor, rawMastery, weakest, coverageGap, answered,
       required: state === 'building_evidence' ? READINESS_CONFIG.targetAnswersForReadiness : READINESS_CONFIG.minimumAnswersForDiagnostic,
       domains: eco,
+      progress,
     };
   },
   getReadiness(extraResults = []) {
     const recent = [...(Array.isArray(extraResults) ? extraResults : []), ...this.getRecentClassifiedHistory()]
       .filter(result => (result.breakdowns?.ecoDomain || []).length);
     return this.calculateReadiness(recent);
+  },
+  getReadinessTrend(days = 30) {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+    const classified = Storage.getHistory()
+      .filter(result => (result.breakdowns?.ecoDomain || []).length)
+      .filter(result => new Date(result.date) >= cutoff)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    const points = classified.map((result, index) => {
+      const readiness = this.calculateReadiness(classified.slice(0, index + 1));
+      const score = readiness.state === 'calibrating' ? (readiness.accuracy || result.percent || 0) : readiness.score;
+      return { date: result.date, score: Math.max(0, Math.min(100, Math.round(score || 0))) };
+    }).filter(point => Number.isFinite(point.score));
+    return {
+      points,
+      start: points.length ? points[0].score : null,
+      current: points.length ? points[points.length - 1].score : null,
+      delta: points.length > 1 ? points[points.length - 1].score - points[0].score : null,
+    };
+  },
+  getEcoReadinessCards(readiness) {
+    const domains = Array.isArray(readiness?.domains) ? readiness.domains : [];
+    return ECO_DOMAIN_KEYS.map(key => {
+      const item = domains.find(domain => domain.key === key) || { key, correct: 0, total: 0, percent: 0 };
+      const status = item.total < READINESS_CONFIG.minimumPerEcoDomain ? 'low_data'
+        : item.percent >= 80 ? 'strong'
+        : item.percent < 70 ? 'weak'
+        : 'steady';
+      return { ...item, status };
+    });
   },
   getReadinessWithAdditionalAnswers(answerRecords) {
     const records = Array.isArray(answerRecords) ? answerRecords : [];
@@ -519,10 +582,10 @@ const StatsManager = {
     const canTrain = item => hasQuestions && QuizEngine.countAvailable(questions, 'quick', filterForSegment('ecoDomain', item.key)) >= 10;
     const weakEnough = readiness.weakest && readiness.weakest.total >= READINESS_CONFIG.minimumPerEcoDomain && canTrain(readiness.weakest);
     const gapTrainable = readiness.coverageGap && canTrain(readiness.coverageGap);
-    const recommended = weakEnough
-      ? { dimension: 'ecoDomain', key: readiness.weakest.key, total: readiness.weakest.total, percent: readiness.weakest.percent, filters: filterForSegment('ecoDomain', readiness.weakest.key) }
-      : gapTrainable
-        ? { dimension: 'ecoDomain', key: readiness.coverageGap.key, total: readiness.coverageGap.total, percent: readiness.coverageGap.percent, filters: filterForSegment('ecoDomain', readiness.coverageGap.key), reason: 'coverage' }
+    const recommended = gapTrainable
+      ? { dimension: 'ecoDomain', key: readiness.coverageGap.key, total: readiness.coverageGap.total, percent: readiness.coverageGap.percent, filters: filterForSegment('ecoDomain', readiness.coverageGap.key), reason: 'coverage' }
+      : weakEnough
+        ? { dimension: 'ecoDomain', key: readiness.weakest.key, total: readiness.weakest.total, percent: readiness.weakest.percent, filters: filterForSegment('ecoDomain', readiness.weakest.key) }
         : this.getRecommendation(questions);
     return {
       readiness,
@@ -960,6 +1023,88 @@ test('readiness is ready with 120 evenly covered ECO answers', () => {
   const readiness = StatsManager.getReadiness();
   assertEqual(readiness.state, 'ready');
   assertEqual(readiness.score, 80);
+});
+test('readiness progress reports ECO domain shortfall after total target is exceeded', () => {
+  reset();
+  Storage.saveResult(classifiedResult(8, 200, {
+    People: { correct: 3, total: 75 },
+    Process: { correct: 3, total: 108 },
+    'Business Environment': { correct: 2, total: 17 },
+  }));
+  const readiness = StatsManager.getReadiness();
+  assertEqual(readiness.state, 'building_evidence');
+  assertEqual(readiness.score, 3);
+  assertEqual(readiness.answered, 200);
+  assertEqual(readiness.coverageGap.key, 'Business Environment');
+  assertEqual(readiness.progress.totalRemaining, 0);
+  assertEqual(readiness.progress.coverageRemaining, 3);
+  assertEqual(readiness.progress.remainingForReadiness, 3);
+  assertEqual(readiness.progress.primaryCoverageGap.key, 'Business Environment');
+  assertEqual(readiness.progress.primaryCoverageGap.missing, 3);
+});
+test('readiness progress uses total remaining when it is larger than ECO shortfall', () => {
+  reset();
+  Storage.saveResult(classifiedResult(30, 60, {
+    Process: { correct: 30, total: 60 },
+  }));
+  const readiness = StatsManager.getReadiness();
+  assertEqual(readiness.state, 'building_evidence');
+  assertEqual(readiness.progress.totalRemaining, 60);
+  assertEqual(readiness.progress.coverageRemaining, 40);
+  assertEqual(readiness.progress.remainingForReadiness, 60);
+  assertEqual(readiness.progress.primaryCoverageGap.key, 'People');
+  assertEqual(readiness.progress.primaryCoverageGap.missing, 20);
+});
+test('readiness insight prioritizes ECO coverage gap over weakest sampled domain', () => {
+  reset();
+  Storage.saveResult(classifiedResult(8, 200, {
+    People: { correct: 3, total: 75 },
+    Process: { correct: 3, total: 108 },
+    'Business Environment': { correct: 2, total: 17 },
+  }));
+  const pool = [
+    ...mockQs,
+    ...Array.from({ length: 12 }, (_, i) => ({ ...mockQs[0], id: 500 + i, eco_domain: 'Business Environment' })),
+  ];
+  const insight = StatsManager.getReadinessInsight(pool);
+  assertEqual(insight.primaryGapLabel, 'Business Environment');
+  assertEqual(insight.recommended.key, 'Business Environment');
+  assertEqual(insight.recommended.reason, 'coverage');
+});
+test('getReadinessTrend summarizes oldest and newest classified progress', () => {
+  reset();
+  Storage.saveResult({ date: '2026-01-01', mode: 'quick', correct: 15, total: 30, percent: 50, breakdowns: {
+    ecoDomain: [
+      { key: 'People', correct: 5, total: 10, percent: 50 },
+      { key: 'Process', correct: 5, total: 10, percent: 50 },
+      { key: 'Business Environment', correct: 5, total: 10, percent: 50 },
+    ],
+  } });
+  Storage.saveResult({ date: TODAY(), mode: 'quick', correct: 96, total: 120, percent: 80, breakdowns: {
+    ecoDomain: [
+      { key: 'People', correct: 32, total: 40, percent: 80 },
+      { key: 'Process', correct: 30, total: 40, percent: 75 },
+      { key: 'Business Environment', correct: 34, total: 40, percent: 85 },
+    ],
+  } });
+  const trend = StatsManager.getReadinessTrend(4000);
+  assert(trend.points.length >= 2);
+  assertEqual(trend.start, trend.points[0].score);
+  assertEqual(trend.current, trend.points[trend.points.length - 1].score);
+  assertEqual(trend.delta, trend.current - trend.start);
+});
+test('getEcoReadinessCards marks low coverage and weak domains', () => {
+  const readiness = {
+    domains: [
+      { key: 'People', correct: 32, total: 40, percent: 80 },
+      { key: 'Process', correct: 12, total: 20, percent: 60 },
+      { key: 'Business Environment', correct: 6, total: 10, percent: 60 },
+    ],
+  };
+  const cards = StatsManager.getEcoReadinessCards(readiness);
+  assertEqual(cards.find(c => c.key === 'People').status, 'strong');
+  assertEqual(cards.find(c => c.key === 'Process').status, 'weak');
+  assertEqual(cards.find(c => c.key === 'Business Environment').status, 'low_data');
 });
 test('readiness treats an ECO domain below minimum sample as coverage gap', () => {
   reset();
