@@ -2555,15 +2555,32 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 
 /* ===== PUBLIC BETA LANDING ===== */
 .beta-screen {
-  max-width: 980px;
-  padding: 22px 18px 34px;
-  gap: 24px;
+  max-width: none;
+  min-height: 100vh;
+  padding: 32px 22px 42px;
+  gap: 18px;
+}
+.beta-screen--light {
+  --bg: #F5F7FB;
+  --surface: #FFFFFF;
+  --surface2: #F8FAFC;
+  --text: #142033;
+  --text2: #5B667A;
+  --border: #DDE4EF;
+  --accent-light: #EEF2FF;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(37,99,235,.08), transparent 34%),
+    #F5F7FB;
+  color: var(--text);
 }
 .beta-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
 }
 .beta-brand {
   display: flex;
@@ -2588,9 +2605,12 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .beta-login-link:hover { background: var(--accent-light); }
 .beta-main {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, .9fr);
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
 }
 .beta-intro,
 .beta-form-panel {
@@ -2598,8 +2618,11 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 22px;
+  padding: 24px;
+  min-height: 360px;
 }
+.beta-intro { display: flex; flex-direction: column; justify-content: space-between; }
+.beta-form-panel { display: flex; flex-direction: column; }
 .beta-intro h2,
 .beta-form-panel h2 {
   font-size: 1.45rem;
@@ -2616,7 +2639,7 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 24px;
 }
 .beta-points span {
   background: var(--accent-light);
@@ -2630,13 +2653,14 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .beta-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 11px;
   margin-top: 16px;
 }
 .beta-form input,
 .beta-form select {
   width: 100%;
-  padding: 14px 16px;
+  min-height: 48px;
+  padding: 12px 16px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -2670,6 +2694,8 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 }
 @media (max-width: 760px) {
   .beta-main { grid-template-columns: 1fr; }
+  .beta-intro,
+  .beta-form-panel { min-height: 0; }
 }
 @media (max-width: 520px) {
   .beta-screen { padding: 18px 14px 28px; }

@@ -1256,6 +1256,7 @@ console.log('\nBeta landing UI:');
 test('beta landing route is public and renders an access request form', () => {
   assert(appSource.includes("Views.beta = {"), 'beta view should exist');
   assert(appSource.includes("location.hash === '#/beta'"), 'hash route #/beta should bypass auth');
+  assert(appSource.includes('screen beta-screen beta-screen--light'), 'beta landing should force a light presentation');
   assert(appSource.includes('submit-beta-application'), 'beta form should call submit-beta-application');
   assert(appSource.includes('id="beta-email"'), 'beta form should include an email field');
   assert(appSource.includes('id="beta-consent"'), 'beta form should include a consent checkbox');

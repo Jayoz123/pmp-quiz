@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-53e08905';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-ffd12dd5';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -2166,7 +2166,7 @@ const App = {
 Views.beta = {
   render() {
     return `
-      <div class="screen beta-screen">
+      <div class="screen beta-screen beta-screen--light">
         <header class="beta-header">
           <div class="beta-brand">
             ${Icons.mark()}
