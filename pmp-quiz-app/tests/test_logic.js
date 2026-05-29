@@ -1,6 +1,11 @@
 // tests/test_logic.js — Node.js test runner (no dependencies)
 // Run: node tests/test_logic.js
 
+const fs = require('node:fs');
+const path = require('node:path');
+
+const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+
 // Mock localStorage for Node
 const _store = {};
 global.localStorage = {
@@ -1235,6 +1240,16 @@ test('buildPayload drops non-route hashes that may contain tokens', () => {
   assertEqual(row.page_href, 'https://pmp.nord-star.pl/');
   assertEqual(row.page_hash, null);
   assertEqual(row.comment, null);
+});
+
+console.log('\nSettings UI:');
+test('privacy policy action is rendered after account actions', () => {
+  const signOutIndex = appSource.indexOf('onclick="Views.home._logout()"');
+  const privacyIndex = appSource.indexOf('href="/privacy-policy.html"');
+
+  assert(signOutIndex !== -1, 'sign out action should exist in settings');
+  assert(privacyIndex !== -1, 'privacy policy action should exist in settings');
+  assert(privacyIndex > signOutIndex, 'privacy policy action should be below account actions');
 });
 
 console.log('\nEngagement:');

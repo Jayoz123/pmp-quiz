@@ -2674,8 +2674,6 @@ Views.home = {
               <span class="settings-toggle__slider"></span>
             </label>
           </div>
-          <a class="settings-action-btn settings-action-btn--link"
-             href="https://pmp.nord-star.pl/privacy-policy.html" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
         </section>
         <section class="settings-group">
           <h3 class="settings-group__title">${t('settings_support')}</h3>
@@ -2696,6 +2694,8 @@ Views.home = {
         <button class="settings-action-btn settings-action-btn--danger"
                  onclick="Views.home._logout()">${t('sign_out')}</button>
         </section>
+        <a class="settings-action-btn settings-action-btn--link"
+           href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">${t('privacy_policy')}</a>
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) Views.home._closeSettings(); });
