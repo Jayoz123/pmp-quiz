@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-ffd12dd5';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-a85035f1';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -1114,6 +1114,28 @@ const Auth = {
     return data; // { ok } or { error }
   },
 
+  // Admin-only: approve a beta application. Calls approve-beta-application with
+  // the admin's OWN access token (the function verifies membership in
+  // public.beta_admins). Returns { ok, code, ... } or { error }.
+  async approveBetaApplication(applicationId) {
+    const { data: { session } } = await sb().auth.getSession();
+    const token = session?.access_token;
+    if (!token) return { error: t('generic_error') };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/approve-beta-application`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${token}`,   // the ADMIN's token, not the anon key
+        'apikey':        SUPABASE_ANON,
+      },
+      body: JSON.stringify({ applicationId }),
+    });
+    let data;
+    try { data = await res.json(); }
+    catch { return { error: t('generic_error') }; }
+    return data;
+  },
+
   async signOut() {
     await sb().auth.signOut();
   },
@@ -2139,6 +2161,14 @@ const App = {
     AppState.showEnglish = (Storage.getSettings().defaultLanguage === 'en');
     await new Promise(r => setTimeout(r, 800));
 
+    // Deep link / bookmark do panelu admina. Sam widok weryfikuje członkostwo
+    // w beta_admins i odmawia dostępu nie-adminom.
+    if (location.hash === '#/admin') {
+      this.navigate('admin');
+      SessionGuard.startHeartbeat();
+      return;
+    }
+
     // Trial Exam — wykrycie niedokończonej sesji egzaminu (plan 12, sekcja 3a).
     const trial = Storage.getTrialSession();
     if (trial && trial.mode === 'trial' && Array.isArray(trial.questions) && trial.questions.length) {
@@ -2280,6 +2310,224 @@ Views.beta = {
     if (!el) return;
     el.textContent = text;
     el.className = `login-msg ${ok ? 'login-msg--ok' : 'login-msg--err'}`;
+  },
+};
+
+// ==================== ADMIN: BETA APPLICATIONS QUEUE ====================
+// Phase-1 admin panel for the LinkedIn beta campaign. Access is gated by the
+// public.beta_admins allow-list: the view loads applications via RLS (admins
+// only), approves through the approve-beta-application Edge Function (assigns a
+// code + sends the Brevo invite), and rejects via a direct RLS-guarded update.
+// Polish-only UI, consistent with Views.beta.
+Views.admin = {
+  _filter: 'new',
+  _busy: false,
+
+  _FILTERS: [
+    { key: 'new',      label: 'Nowe' },
+    { key: 'sent',     label: 'Wyslane' },
+    { key: 'rejected', label: 'Odrzucone' },
+    { key: 'failed',   label: 'Bledy' },
+    { key: 'all',      label: 'Wszystkie' },
+  ],
+
+  render() {
+    const chips = this._FILTERS.map(f =>
+      `<button class="admin-chip ${this._filter === f.key ? 'active' : ''}"
+               onclick="Views.admin._setFilter('${f.key}')">${f.label}</button>`).join('');
+    return `
+      <div class="screen admin-screen">
+        <header class="admin-header">
+          <div>
+            <p class="home-brand">PM Academy</p>
+            <h1>Panel bety</h1>
+          </div>
+          <button class="btn-gray" onclick="App.navigate('home')">${t('back')}</button>
+        </header>
+        <div id="admin-guard-msg" class="login-msg hidden"></div>
+        <div class="admin-filters" id="admin-filters">${chips}</div>
+        <div id="admin-list" class="admin-list">Ladowanie…</div>
+      </div>`;
+  },
+
+  async init() {
+    const ok = await this._guard();
+    if (!ok) {
+      const filters = document.getElementById('admin-filters');
+      const list = document.getElementById('admin-list');
+      if (filters) filters.classList.add('hidden');
+      if (list) list.innerHTML = '';
+      const msg = document.getElementById('admin-guard-msg');
+      if (msg) {
+        msg.textContent = 'Brak uprawnien admina.';
+        msg.className = 'login-msg login-msg--err';
+      }
+      return;
+    }
+    await this._load();
+  },
+
+  // True only when the signed-in user is in public.beta_admins.
+  async _guard() {
+    try {
+      const { data: { user } } = await sb().auth.getUser();
+      if (!user) return false;
+      const { data, error } = await sb()
+        .from('beta_admins')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) return false;
+      return !!data;
+    } catch (_e) {
+      return false;
+    }
+  },
+
+  _setFilter(key) {
+    this._filter = key;
+    const filters = document.getElementById('admin-filters');
+    if (filters) {
+      [...filters.querySelectorAll('.admin-chip')].forEach(b => b.classList.remove('active'));
+    }
+    App.render();
+    this._load();
+  },
+
+  async _load() {
+    const list = document.getElementById('admin-list');
+    if (list) list.innerHTML = 'Ladowanie…';
+    let query = sb()
+      .from('beta_applications')
+      .select('id,email,name,linkedin_url,pmp_stage,status,assigned_code,created_at,sent_at,last_error')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (this._filter !== 'all') query = query.eq('status', this._filter);
+    const { data, error } = await query;
+    if (!list) return;
+    if (error) {
+      list.innerHTML = `<p class="admin-empty">Nie udalo sie pobrac zgloszen.</p>`;
+      return;
+    }
+    if (!data || !data.length) {
+      list.innerHTML = `<p class="admin-empty">Brak zgloszen w tym widoku.</p>`;
+      return;
+    }
+    list.innerHTML = data.map(a => this._row(a)).join('');
+  },
+
+  _row(a) {
+    const name = a.name ? this._esc(a.name) : '<span class="admin-muted">bez imienia</span>';
+    const stage = a.pmp_stage ? `<span class="admin-tag">${this._esc(a.pmp_stage)}</span>` : '';
+    const code = a.assigned_code ? `<span class="admin-tag admin-tag--code">${this._esc(a.assigned_code)}</span>` : '';
+    const li = this._linkedin(a.linkedin_url);
+    const err = a.last_error ? `<p class="admin-error">${this._esc(a.last_error)}</p>` : '';
+    const canApprove = a.status === 'new' || a.status === 'approved' || a.status === 'failed';
+    const canReject = a.status !== 'rejected' && a.status !== 'sent';
+    const actions = [];
+    if (canApprove) {
+      actions.push(`<button class="btn-primary admin-action" onclick="Views.admin._approve('${a.id}')">Zatwierdz i wyslij kod</button>`);
+    }
+    if (canReject) {
+      actions.push(`<button class="btn-gray admin-action" onclick="Views.admin._reject('${a.id}')">Odrzuc</button>`);
+    }
+    return `
+      <article class="admin-card" id="app-${a.id}">
+        <div class="admin-card__top">
+          <div class="admin-card__who">
+            <div class="admin-card__name">${name}</div>
+            <a class="admin-card__email" href="mailto:${this._esc(a.email)}">${this._esc(a.email)}</a>
+          </div>
+          ${this._statusBadge(a.status)}
+        </div>
+        <div class="admin-card__meta">${stage}${code}${li}<span class="admin-date">${this._fmtDate(a.created_at)}</span></div>
+        ${err}
+        <div class="admin-card__actions">${actions.join('')}</div>
+      </article>`;
+  },
+
+  _linkedin(url) {
+    if (!url) return '';
+    const safe = this._esc(url);
+    if (/^https:\/\//i.test(url)) {
+      return `<a class="admin-tag admin-tag--link" href="${safe}" target="_blank" rel="noopener noreferrer">LinkedIn</a>`;
+    }
+    return `<span class="admin-tag">${safe}</span>`;
+  },
+
+  _statusBadge(status) {
+    const map = {
+      new:      ['Nowe', 'is-new'],
+      approved: ['Zatwierdzone', 'is-approved'],
+      sent:     ['Wyslane', 'is-sent'],
+      rejected: ['Odrzucone', 'is-rejected'],
+      failed:   ['Blad wysylki', 'is-failed'],
+    };
+    const [label, cls] = map[status] || [status, ''];
+    return `<span class="admin-badge ${cls}">${this._esc(label)}</span>`;
+  },
+
+  async _approve(id) {
+    if (this._busy) return;
+    if (!window.confirm('Zatwierdzic zgloszenie i wyslac kod na email kandydata?')) return;
+    this._busy = true;
+    this._setRowBusy(id, true, 'Wysylam kod…');
+    const data = await Auth.approveBetaApplication(id);
+    this._busy = false;
+    if (!data || !data.ok) {
+      this._setRowBusy(id, false);
+      window.alert((data && data.error) || 'Nie udalo sie zatwierdzic zgloszenia.');
+      return;
+    }
+    await this._load();
+  },
+
+  async _reject(id) {
+    if (this._busy) return;
+    if (!window.confirm('Odrzucic to zgloszenie? Kandydat nie dostanie kodu.')) return;
+    this._busy = true;
+    this._setRowBusy(id, true, 'Odrzucam…');
+    const now = new Date().toISOString();
+    const { error } = await sb()
+      .from('beta_applications')
+      .update({ status: 'rejected', rejected_at: now, updated_at: now })
+      .eq('id', id);
+    this._busy = false;
+    if (error) {
+      this._setRowBusy(id, false);
+      window.alert('Nie udalo sie odrzucic zgloszenia.');
+      return;
+    }
+    await this._load();
+  },
+
+  _setRowBusy(id, busy, label) {
+    const card = document.getElementById(`app-${id}`);
+    if (!card) return;
+    card.classList.toggle('admin-card--busy', busy);
+    const btns = card.querySelectorAll('.admin-action');
+    btns.forEach(b => { b.disabled = busy; });
+    if (busy && label && btns[0]) btns[0].textContent = label;
+  },
+
+  _esc(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  },
+
+  _fmtDate(iso) {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString('pl-PL', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+    } catch (_e) {
+      return this._esc(iso);
+    }
   },
 };
 
@@ -2816,6 +3064,8 @@ Views.home = {
         </section>
         <section class="settings-group">
           <h3 class="settings-group__title">${t('settings_account')}</h3>
+        <button id="settings-admin-link" class="settings-action-btn hidden"
+                 onclick="Views.home._closeSettings(); App.navigate('admin')">Panel bety (admin)</button>
         <button class="settings-action-btn settings-action-btn--danger"
                  onclick="Views.home._logout()">${t('sign_out')}</button>
         </section>
@@ -2824,6 +3074,24 @@ Views.home = {
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) Views.home._closeSettings(); });
+    this._revealAdminLink();
+  },
+
+  // Reveal the beta admin panel link only for users in public.beta_admins.
+  // RLS lets a user read only their own beta_admins row, so a non-admin gets
+  // no row and the link stays hidden.
+  async _revealAdminLink() {
+    try {
+      const { data: { user } } = await sb().auth.getUser();
+      if (!user) return;
+      const { data, error } = await sb()
+        .from('beta_admins')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error || !data) return;
+      document.getElementById('settings-admin-link')?.classList.remove('hidden');
+    } catch (_e) { /* keep hidden on any error */ }
   },
 
   _closeSettings() {

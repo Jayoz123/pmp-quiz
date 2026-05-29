@@ -1,0 +1,10 @@
+.artifacts
+.artifacts/**
+.idea
+.idea/**
+tests
+tests/**
+migrations
+migrations/**
+questions_pre_m4_backup_20260526.json
+questions_v2.json
