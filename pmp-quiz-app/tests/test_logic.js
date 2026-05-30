@@ -1364,6 +1364,5 @@ test('trial badges unlock when conditions met', () => {
   assert(u.includes('trial_first') && u.includes('trial_marathon') && u.includes('trial_target') && u.includes('trial_clock'));
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
-
+console.log('\nMode-select scope toggle:');
+test('_applyTraining leaves _advanced =

@@ -398,6 +398,10 @@ const I18N = {
   preset_all:         { pl: 'Wszystkie',                        en: 'All' },
   preset_calculation: { pl: 'Obliczenia',                       en: 'Calculations' },
   customize_scope:    { pl: 'Dostosuj zakres',                  en: 'Customize scope' },
+  scope_auto:         { pl: 'AUTO',                              en: 'AUTO' },
+  scope_custom:       { pl: 'CUSTOM',                            en: 'CUSTOM' },
+  scope_auto_hint:    { pl: 'Aplikacja sama dobiera pytania.',   en: 'The app picks questions for you.' },
+  scope_summary:      { pl: 'Zakres: {label}',                   en: 'Scope: {label}' },
   count_label:        { pl: 'Liczba pytań',                     en: 'Number of questions' },
   available_count:    { pl: 'Dostępnych pytań: {n}',            en: 'Available questions: {n}' },
   pool_too_small:     { pl: 'Dostępnych jest tylko {n} pytań. Zmień filtry lub liczbę pytań.', en: 'Only {n} questions are available. Change filters or question count.' },
@@ -1644,7 +1648,8 @@ const StatsManager = {
       return sum + Math.min(1, item.total / READINESS_CONFIG.targetPerEcoDomain);
     }, 0) / ECO_DOMAIN_KEYS.length;
     const coverageFactor = answeredFactor * minEcoCoverageFactor;
-    const score = Math.round(rawMastery * coverageFactor);
+    const scoreRaw = rawMastery * coverageFactor;
+    const score = Math.round(scoreRaw);
     const sampled = eco.filter(item => item.total >= 5);
     const weakest = sampled.slice().sort((a, b) => a.percent - b.percent || b.total - a.total)[0] || null;
     const coverageGap = eco
@@ -1655,7 +1660,7 @@ const StatsManager = {
       : 'building_evidence';
     const progress = this.calculateReadinessProgress(answered, eco, state);
     return {
-      state, score, accuracy, coverageFactor, rawMastery, weakest, coverageGap, answered,
+      state, score, scoreRaw, accuracy, coverageFactor, rawMastery, weakest, coverageGap, answered,
       required: state === 'building_evidence' ? READINESS_CONFIG.targetAnswersForReadiness : READINESS_CONFIG.minimumAnswersForDiagnostic,
       domains: eco,
       progress,
@@ -1707,7 +1712,10 @@ const StatsManager = {
     const delta = before.state === 'ready' && after.state === 'ready'
       ? after.score - before.score
       : null;
-    return { before, after, delta };
+    const deltaPermille = before.state === 'ready' && after.state === 'ready'
+      ? Math.round((after.scoreRaw - before.scoreRaw) * 10)
+      : null;
+    return { before, after, delta, deltaPermille };
   },
   getReadinessInsight(questions) {
     const readiness = this.getReadiness();
@@ -3247,7 +3255,10 @@ Views['mode-select'] = {
             <button class="preset-chip ${this._selectedMode === 'weak' ? 'selected' : ''} ${weakDisabled ? 'disabled' : ''}"
                     ${weakDisabled ? 'disabled' : "onclick=\"Views['mode-select']._setPreset('weak')\""}>${t('weak_questions')}</button>
           </div>
-          <button class="filters-toggle" onclick="Views['mode-select']._toggleAdvanced()">${t('customize_scope')} ${this._advanced ? '▲' : '▼'}</button>
+          <div class="scope-toggle" role="tablist" aria-label="${t('customize_scope')}">
+            <button class="scope-toggle__opt ${this._advanced ? '' : 'selected'}" role="tab" aria-selected="${!this._advanced}" onclick="Views['mode-select']._setScope('auto')">${t('scope_auto')}</button>
+            <button class="scope-toggle__opt ${this._advanced ? 'selected' : ''}" role="tab" aria-selected="${this._advanced}" onclick="Views['mode-select']._setScope('custom')">${t('scope_custom')}</button>
+          </div>
           ${this._advanced ? `
           <div class="filters-advanced">
             <p class="filters-hint">${t('filter_empty_hint')}</p>
@@ -3256,7 +3267,9 @@ Views['mode-select'] = {
             <div class="filter-section"><label>${t('filter_domains')}</label><div class="domain-chips">${renderChips('domains', domains, tDomain)}</div></div>
             <div class="filter-section"><label>${t('filter_qtype')}</label><div class="domain-chips">${renderChips('qtypes', Object.keys(QTYPE_I18N), tQtype)}</div></div>
             <div class="filter-section"><label>${t('filter_difficulty')}</label><div class="domain-chips">${renderChips('difficulties', Object.keys(DIFFICULTY_I18N), tDifficulty)}</div></div>
-          </div>` : ''}
+          </div>` : (this._preset === 'custom' && this._summarizeScope()
+            ? `<div class="scope-summary-chip" title="${t('customize_scope')}">${t('scope_summary', { label: this._summarizeScope() })}</div>`
+            : `<p class="scope-auto-hint">${t('scope_auto_hint')}</p>`)}
         </div>
         <p class="weak-status">${weakSubtitle}</p>
         ${this._selectedMode === 'quick' ? `
@@ -3286,6 +3299,26 @@ Views['mode-select'] = {
 
   _toggleAdvanced() { this._advanced = !this._advanced; App.render(); },
 
+  _setScope(mode) {
+    const next = mode === 'custom';
+    if (this._advanced === next) return;
+    this._advanced = next;
+    App.render();
+  },
+
+  _summarizeScope() {
+    const f = this._filters || {};
+    const parts = [];
+    const push = (axis, labelFn) => (f[axis] || []).forEach(k => parts.push(labelFn(k)));
+    push('ecoDomains', tEcoDomain);
+    push('approachTags', tApproach);
+    push('domains', tDomain);
+    push('qtypes', tQtype);
+    push('difficulties', tDifficulty);
+    if (!parts.length) return '';
+    return parts.length <= 3 ? parts.join(' · ') : `${parts.slice(0, 3).join(' · ')} +${parts.length - 3}`;
+  },
+
   _toggleFilter(axis, value) {
     this._selectedMode = 'quick';
     this._preset = 'custom';
@@ -3302,7 +3335,7 @@ Views['mode-select'] = {
     this._selectedMode = 'quick';
     this._preset = 'custom';
     this._count = 10;
-    this._advanced = true;
+    this._advanced = false;
     this._filters = filterForSegment(dimension, key);
     App.navigate('mode-select');
   },
@@ -4040,9 +4073,10 @@ Views.quiz = {
     const answersBefore = session.answers.slice();
     const answerRecord = QuizEngine.answerRecord(q, isCorrect);
     const readinessPreview = StatsManager.previewReadinessDelta(answersBefore, answerRecord);
-    const readinessDeltaText = readinessPreview.delta === null
+    const deltaPermille = readinessPreview.deltaPermille;
+    const readinessDeltaText = deltaPermille === null
       ? t('readiness_question_calibrating')
-      : t('readiness_question_delta', { n: `${readinessPreview.delta > 0 ? '+' : ''}${readinessPreview.delta}%` });
+      : t('readiness_question_delta', { n: `${deltaPermille > 0 ? '+' : ''}${deltaPermille}‰` });
     const questionExp = Engagement.questionExp(isCorrect);
 
     QuizEngine.recordAnswer(q.id, isCorrect, confidence);
@@ -4951,37 +4985,4 @@ Views.stats = {
 
   _renderTrendChart(trend) {
     const points = Array.isArray(trend?.points) ? trend.points : [];
-    if (points.length < 2) return `<p class="trend-empty">${t('no_trend_data')}</p>`;
-    const plot = points.map((point, index) => {
-      const x = 6 + (index * 88 / Math.max(1, points.length - 1));
-      const y = 8 + ((100 - point.score) * 42 / 100);
-      return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
-    });
-    const linePath = plot.map((point, index) => `${index ? 'L' : 'M'}${point.x} ${point.y}`).join(' ');
-    const areaPath = `${linePath} L${plot[plot.length - 1].x} 54 L${plot[0].x} 54 Z`;
-    return `
-      <svg class="trend-chart" viewBox="0 0 100 60" role="img" aria-label="${t('progress_over_time')}">
-        <path class="trend-chart__grid" d="M6 8H94M6 29H94M6 50H94"/>
-        <path class="trend-chart__area" d="${areaPath}"/>
-        <path class="trend-chart__line" d="${linePath}"/>
-        ${plot.map(point => `<circle class="trend-chart__dot" cx="${point.x}" cy="${point.y}" r="2.2"/>`).join('')}
-      </svg>`;
-  },
-
-  _renderMonthGrid(year, month) {
-    const days = StreakManager.getMonthData(year, month);
-    return days.map(day => {
-      if (day.type === 'padding') return `<div class="calendar-cell padding"></div>`;
-      const hasActivity = day.status === 'done' || day.status === 'activity';
-      const onClick = hasActivity ? `onclick="event.stopPropagation(); Views.stats._showDayDetails('${day.date}', this)"` : '';
-      return `<button type="button" class="calendar-cell calendar-cell--${day.status} ${day.isToday ? 'today' : ''}"
-                   title="${day.date}" ${onClick} aria-label="${day.date}">
-                <span class="calendar-cell__num">${day.dayNum}</span>
-                <span class="calendar-cell__marker"></span>
-              </button>`;
-    }).join('');
-  },
-};
-
-// ==================== BOOT ====================
-document.addEventListener('DOMContentLoaded', () => App.init());
+ 
