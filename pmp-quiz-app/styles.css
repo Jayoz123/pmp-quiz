@@ -710,6 +710,43 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   color: var(--text2);
   line-height: 1.45;
 }
+.filter-section--weak {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.weak-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.weak-toggle.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+}
+.weak-toggle.disabled,
+.weak-toggle[disabled] { opacity: 0.45; cursor: not-allowed; }
+.weak-toggle__dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.15s;
+}
+.weak-toggle.selected .weak-toggle__dot { background: var(--accent); }
+.weak-toggle__hint {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text2);
+}
 .filters-hint {
   color: var(--text2);
   font-size: 0.8rem;

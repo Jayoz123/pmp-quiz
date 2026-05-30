@@ -1383,6 +1383,21 @@ test('_setScope method exists and toggles _advanced via mode string', () => {
   assert(appSource.includes("Views['mode-select']._setScope('auto')"), 'AUTO option should call _setScope("auto")');
   assert(appSource.includes("Views['mode-select']._setScope('custom')"), 'CUSTOM option should call _setScope("custom")');
 });
+test('mode-select view no longer renders Wszystkie/Agile/Obliczenia preset chips above scope-toggle', () => {
+  const modeViewStart = appSource.indexOf("Views['mode-select'] = {");
+  assert(modeViewStart !== -1, 'mode-select view should exist');
+  const modeViewEnd = appSource.indexOf("\n};", modeViewStart);
+  const view = appSource.slice(modeViewStart, modeViewEnd);
+  assert(!view.includes("_setPreset('all')"), "_setPreset('all') chip should be removed");
+  assert(!view.includes("_setPreset('agile')"), "_setPreset('agile') chip should be removed");
+  assert(!view.includes("_setPreset('calculation')"), "_setPreset('calculation') chip should be removed");
+  assert(!view.includes("_setPreset('weak')"), "_setPreset('weak') chip should be removed (replaced by _toggleWeak in CUSTOM)");
+});
+test('weak questions moved to CUSTOM section via _toggleWeak', () => {
+  assert(appSource.includes('_toggleWeak()'), '_toggleWeak helper should be defined');
+  assert(appSource.includes("filter-section--weak"), 'weak section should be rendered inside filters-advanced');
+  assert(appSource.includes("Views['mode-select']._toggleWeak()"), 'weak toggle should call _toggleWeak');
+});
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

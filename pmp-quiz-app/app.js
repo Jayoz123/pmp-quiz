@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-5266bd3b';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-98817ff3';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -402,6 +402,8 @@ const I18N = {
   scope_custom:       { pl: 'CUSTOM',                            en: 'CUSTOM' },
   scope_auto_hint:    { pl: 'Aplikacja sama dobiera pytania.',   en: 'The app picks questions for you.' },
   scope_summary:      { pl: 'Zakres: {label}',                   en: 'Scope: {label}' },
+  weak_on:            { pl: 'Włączone',                          en: 'On' },
+  weak_off:           { pl: 'Wyłączone',                         en: 'Off' },
   count_label:        { pl: 'Liczba pytań',                     en: 'Number of questions' },
   available_count:    { pl: 'Dostępnych pytań: {n}',            en: 'Available questions: {n}' },
   pool_too_small:     { pl: 'Dostępnych jest tylko {n} pytań. Zmień filtry lub liczbę pytań.', en: 'Only {n} questions are available. Change filters or question count.' },
@@ -3248,30 +3250,35 @@ Views['mode-select'] = {
         <div class="mode-card ${this._selectedMode === 'quick' ? 'selected' : ''}">
           <h3>${t('standard_quiz')}</h3>
           <p>${t('standard_quiz_desc')}</p>
-          <div class="preset-chips">
-            <button class="preset-chip ${this._preset === 'all' && this._selectedMode === 'quick' ? 'selected' : ''}" onclick="Views['mode-select']._setPreset('all')">${t('preset_all')}</button>
-            <button class="preset-chip ${this._preset === 'agile' ? 'selected' : ''}" onclick="Views['mode-select']._setPreset('agile')">Agile</button>
-            <button class="preset-chip ${this._preset === 'calculation' ? 'selected' : ''}" onclick="Views['mode-select']._setPreset('calculation')">${t('preset_calculation')}</button>
-            <button class="preset-chip ${this._selectedMode === 'weak' ? 'selected' : ''} ${weakDisabled ? 'disabled' : ''}"
-                    ${weakDisabled ? 'disabled' : "onclick=\"Views['mode-select']._setPreset('weak')\""}>${t('weak_questions')}</button>
-          </div>
           <div class="scope-toggle" role="tablist" aria-label="${t('customize_scope')}">
             <button class="scope-toggle__opt ${this._advanced ? '' : 'selected'}" role="tab" aria-selected="${!this._advanced}" onclick="Views['mode-select']._setScope('auto')">${t('scope_auto')}</button>
             <button class="scope-toggle__opt ${this._advanced ? 'selected' : ''}" role="tab" aria-selected="${this._advanced}" onclick="Views['mode-select']._setScope('custom')">${t('scope_custom')}</button>
           </div>
           ${this._advanced ? `
           <div class="filters-advanced">
+            <div class="filter-section filter-section--weak">
+              <label>${t('weak_questions')}</label>
+              <button type="button"
+                      class="weak-toggle ${this._selectedMode === 'weak' ? 'selected' : ''} ${weakDisabled ? 'disabled' : ''}"
+                      role="switch" aria-checked="${this._selectedMode === 'weak'}"
+                      ${weakDisabled ? 'disabled' : "onclick=\"Views['mode-select']._toggleWeak()\""}>
+                <span class="weak-toggle__dot"></span>
+                <span class="weak-toggle__label">${this._selectedMode === 'weak' ? t('weak_on') : t('weak_off')}</span>
+              </button>
+              <p class="weak-toggle__hint">${weakSubtitle}</p>
+            </div>
             <p class="filters-hint">${t('filter_empty_hint')}</p>
             <div class="filter-section"><label>${t('filter_eco')}</label><div class="domain-chips">${renderChips('ecoDomains', Object.keys(ECO_I18N), tEcoDomain)}</div></div>
             <div class="filter-section"><label>${t('filter_approach')}</label><div class="domain-chips">${renderChips('approachTags', Object.keys(APPROACH_I18N), tApproach)}</div></div>
             <div class="filter-section"><label>${t('filter_domains')}</label><div class="domain-chips">${renderChips('domains', domains, tDomain)}</div></div>
             <div class="filter-section"><label>${t('filter_qtype')}</label><div class="domain-chips">${renderChips('qtypes', Object.keys(QTYPE_I18N), tQtype)}</div></div>
             <div class="filter-section"><label>${t('filter_difficulty')}</label><div class="domain-chips">${renderChips('difficulties', Object.keys(DIFFICULTY_I18N), tDifficulty)}</div></div>
-          </div>` : (this._preset === 'custom' && this._summarizeScope()
-            ? `<div class="scope-summary-chip" title="${t('customize_scope')}">${t('scope_summary', { label: this._summarizeScope() })}</div>`
-            : `<p class="scope-auto-hint">${t('scope_auto_hint')}</p>`)}
+          </div>` : (this._selectedMode === 'weak'
+            ? `<div class="scope-summary-chip" title="${t('weak_questions')}">${t('scope_summary', { label: t('weak_questions') })}</div>`
+            : (this._preset === 'custom' && this._summarizeScope()
+              ? `<div class="scope-summary-chip" title="${t('customize_scope')}">${t('scope_summary', { label: this._summarizeScope() })}</div>`
+              : `<p class="scope-auto-hint">${t('scope_auto_hint')}</p>`))}
         </div>
-        <p class="weak-status">${weakSubtitle}</p>
         ${this._selectedMode === 'quick' ? `
         <div class="question-count">
           <label>${t('count_label')}</label>
@@ -3294,6 +3301,17 @@ Views['mode-select'] = {
     this._selectedMode = preset === 'weak' ? 'weak' : 'quick';
     if (preset === 'agile') this._filters.approachTags = ['agile'];
     if (preset === 'calculation') this._filters.qtypes = ['calculation'];
+    App.render();
+  },
+
+  _toggleWeak() {
+    if (this._selectedMode === 'weak') {
+      this._selectedMode = 'quick';
+      this._preset = 'all';
+    } else {
+      this._selectedMode = 'weak';
+      this._preset = 'weak';
+    }
     App.render();
   },
 
