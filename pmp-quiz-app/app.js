@@ -3273,11 +3273,15 @@ Views['mode-select'] = {
             <div class="filter-section"><label>${t('filter_domains')}</label><div class="domain-chips">${renderChips('domains', domains, tDomain)}</div></div>
             <div class="filter-section"><label>${t('filter_qtype')}</label><div class="domain-chips">${renderChips('qtypes', Object.keys(QTYPE_I18N), tQtype)}</div></div>
             <div class="filter-section"><label>${t('filter_difficulty')}</label><div class="domain-chips">${renderChips('difficulties', Object.keys(DIFFICULTY_I18N), tDifficulty)}</div></div>
-          </div>` : (this._selectedMode === 'weak'
-            ? `<div class="scope-summary-chip" title="${t('weak_questions')}">${t('scope_summary', { label: t('weak_questions') })}</div>`
-            : (this._preset === 'custom' && this._summarizeScope()
-              ? `<div class="scope-summary-chip" title="${t('customize_scope')}">${t('scope_summary', { label: this._summarizeScope() })}</div>`
-              : `<p class="scope-auto-hint">${t('scope_auto_hint')}</p>`))}
+          </div>` : (() => {
+            const summary = this._summarizeScope();
+            const weakOn = this._selectedMode === 'weak';
+            if (weakOn || summary) {
+              const label = weakOn && summary ? `${t('weak_questions')} · ${summary}` : (weakOn ? t('weak_questions') : summary);
+              return `<div class="scope-summary-chip" title="${t('customize_scope')}">${t('scope_summary', { label })}</div>`;
+            }
+            return `<p class="scope-auto-hint">${t('scope_auto_hint')}</p>`;
+          })()}
         </div>
         ${this._selectedMode === 'quick' ? `
         <div class="question-count">
@@ -3338,7 +3342,9 @@ Views['mode-select'] = {
   },
 
   _toggleFilter(axis, value) {
-    this._selectedMode = 'quick';
+    // Nie ruszamy _selectedMode — weak ma współistnieć z filtrami axis.
+    // (QuizEngine.selectQuestions/countAvailable filtruje weak po przejściu matchesFilters.)
+    if (this._selectedMode !== 'weak') this._selectedMode = 'quick';
     this._preset = 'custom';
     const selected = this._filters[axis];
     const idx = selected.indexOf(value);
@@ -4978,63 +4984,4 @@ Views.stats = {
           <p class="stats-note">${t('data_since_update')}</p>
           <div class="breakdown-list">${breakdownRows}</div>
         </div>
-        <button class="btn-gray" onclick="App.navigate('home')">${t('back')}</button>
-        ${appNav('stats')}
-      </div>`;
-  },
-
-  _ecoStatusLabel(status) {
-    return {
-      strong: t('strong_domain'),
-      steady: t('steady_domain'),
-      weak: t('weak_domain'),
-      low_data: t('low_data_domain'),
-    }[status] || t('no_data');
-  },
-
-  _formatTrendDelta(delta) {
-    if (delta === null || delta === undefined) return '—';
-    return `${delta > 0 ? '+' : ''}${delta} pkt`;
-  },
-
-  _trendStat(label, value) {
-    return `<div><span>${label}</span><strong>${value}</strong></div>`;
-  },
-
-  _renderTrendChart(trend) {
-    const points = Array.isArray(trend?.points) ? trend.points : [];
-    if (points.length < 2) return `<p class="trend-empty">${t('no_trend_data')}</p>`;
-    const plot = points.map((point, index) => {
-      const x = 6 + (index * 88 / Math.max(1, points.length - 1));
-      const y = 8 + ((100 - point.score) * 42 / 100);
-      return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
-    });
-    const linePath = plot.map((point, index) => `${index ? 'L' : 'M'}${point.x} ${point.y}`).join(' ');
-    const areaPath = `${linePath} L${plot[plot.length - 1].x} 54 L${plot[0].x} 54 Z`;
-    return `
-      <svg class="trend-chart" viewBox="0 0 100 60" role="img" aria-label="${t('progress_over_time')}">
-        <path class="trend-chart__grid" d="M6 8H94M6 29H94M6 50H94"/>
-        <path class="trend-chart__area" d="${areaPath}"/>
-        <path class="trend-chart__line" d="${linePath}"/>
-        ${plot.map(point => `<circle class="trend-chart__dot" cx="${point.x}" cy="${point.y}" r="2.2"/>`).join('')}
-      </svg>`;
-  },
-
-  _renderMonthGrid(year, month) {
-    const days = StreakManager.getMonthData(year, month);
-    return days.map(day => {
-      if (day.type === 'padding') return `<div class="calendar-cell padding"></div>`;
-      const hasActivity = day.status === 'done' || day.status === 'activity';
-      const onClick = hasActivity ? `onclick="event.stopPropagation(); Views.stats._showDayDetails('${day.date}', this)"` : '';
-      return `<button type="button" class="calendar-cell calendar-cell--${day.status} ${day.isToday ? 'today' : ''}"
-                   title="${day.date}" ${onClick} aria-label="${day.date}">
-                <span class="calendar-cell__num">${day.dayNum}</span>
-                <span class="calendar-cell__marker"></span>
-              </button>`;
-    }).join('');
-  },
-};
-
-// ==================== BOOT ====================
-document.addEventListener('DOMContentLoaded', () => App.init());
-
+      

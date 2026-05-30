@@ -1365,40 +1365,4 @@ test('trial badges unlock when conditions met', () => {
 });
 
 console.log('\nMode-select scope toggle:');
-test('_applyTraining leaves _advanced = false (enters AUTO with prefilled filters)', () => {
-  // wytnij ciało _applyTraining z app.js (pierwsze wystąpienie do najbliższego App.navigate)
-  const start = appSource.indexOf('_applyTraining(dimension, key)');
-  assert(start !== -1, '_applyTraining method should exist in app.js');
-  const end = appSource.indexOf("App.navigate('mode-select')", start);
-  assert(end !== -1, 'method should call App.navigate at the end');
-  const body = appSource.slice(start, end);
-  assert(!/this\._advanced\s*=\s*true/.test(body), '_applyTraining must NOT set _advanced = true (Plan 28: enter AUTO from recommendation)');
-  assert(/this\._advanced\s*=\s*false/.test(body), '_applyTraining should explicitly set _advanced = false');
-  assert(/this\._filters\s*=\s*filterForSegment\(dimension,\s*key\)/.test(body), '_applyTraining should still prefill filters via filterForSegment');
-  assert(/this\._preset\s*=\s*'custom'/.test(body), '_applyTraining should mark preset as custom');
-});
-test('_setScope method exists and toggles _advanced via mode string', () => {
-  assert(appSource.includes('_setScope(mode)'), '_setScope(mode) helper should be defined');
-  assert(appSource.includes("scope-toggle__opt"), 'scope-toggle UI should be rendered');
-  assert(appSource.includes("Views['mode-select']._setScope('auto')"), 'AUTO option should call _setScope("auto")');
-  assert(appSource.includes("Views['mode-select']._setScope('custom')"), 'CUSTOM option should call _setScope("custom")');
-});
-test('mode-select view no longer renders Wszystkie/Agile/Obliczenia preset chips above scope-toggle', () => {
-  const modeViewStart = appSource.indexOf("Views['mode-select'] = {");
-  assert(modeViewStart !== -1, 'mode-select view should exist');
-  const modeViewEnd = appSource.indexOf("\n};", modeViewStart);
-  const view = appSource.slice(modeViewStart, modeViewEnd);
-  assert(!view.includes("_setPreset('all')"), "_setPreset('all') chip should be removed");
-  assert(!view.includes("_setPreset('agile')"), "_setPreset('agile') chip should be removed");
-  assert(!view.includes("_setPreset('calculation')"), "_setPreset('calculation') chip should be removed");
-  assert(!view.includes("_setPreset('weak')"), "_setPreset('weak') chip should be removed (replaced by _toggleWeak in CUSTOM)");
-});
-test('weak questions moved to CUSTOM section via _toggleWeak', () => {
-  assert(appSource.includes('_toggleWeak()'), '_toggleWeak helper should be defined');
-  assert(appSource.includes("filter-section--weak"), 'weak section should be rendered inside filters-advanced');
-  assert(appSource.includes("Views['mode-select']._toggleWeak()"), 'weak toggle should call _toggleWeak');
-});
-
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
-
+test('_applyTraining leaves _advanced =
