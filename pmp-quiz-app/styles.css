@@ -2824,4 +2824,59 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   border-radius: var(--radius-sm);
   padding: 16px;
 }
-.admin-card--busy { opacity: 0.6; pointer-eve
+.admin-card--busy { opacity: 0.6; pointer-events: none; }
+.admin-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.admin-card__name { font-weight: 700; }
+.admin-card__email { color: var(--accent); text-decoration: none; word-break: break-all; font-size: 0.92rem; }
+.admin-muted { color: var(--text2); font-weight: 500; }
+.admin-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.admin-tag {
+  background: var(--surface2);
+  color: var(--text2);
+  border-radius: var(--radius-xs);
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.admin-tag--code { background: var(--accent-light); color: var(--accent); letter-spacing: 0.04em; }
+.admin-tag--link { color: var(--accent); text-decoration: none; }
+.admin-date { color: var(--text2); font-size: 0.8rem; margin-left: auto; }
+.admin-error {
+  color: var(--red);
+  background: var(--red-light);
+  border-radius: var(--radius-xs);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  margin: 0 0 12px;
+  word-break: break-word;
+}
+.admin-card__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-action { flex: 1; min-width: 140px; }
+.admin-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.admin-badge.is-new { background: var(--accent-light); color: var(--accent); }
+.admin-badge.is-approved { background: var(--surface2); color: var(--text2); }
+.admin-badge.is-sent { background: rgba(24,169,153,0.16); color: var(--green); }
+.admin-badge.is-rejected { background: var(--surface2); color: var(--text2); }
+.admin-badge.is-failed { background: var(--red-light); color: var(--red); }
+@media (max-width: 520px) {
+  .admin-date { margin-left: 0; }
+  .admin-action { flex: 1 1 100%; }
+}
