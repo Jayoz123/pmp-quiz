@@ -5037,3 +5037,4 @@ Views.stats = {
 
 // ==================== BOOT ====================
 document.addEventListener('DOMContentLoaded', () => App.init());
+
