@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-a85035f1';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-5266bd3b';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -4985,4 +4985,37 @@ Views.stats = {
 
   _renderTrendChart(trend) {
     const points = Array.isArray(trend?.points) ? trend.points : [];
- 
+    if (points.length < 2) return `<p class="trend-empty">${t('no_trend_data')}</p>`;
+    const plot = points.map((point, index) => {
+      const x = 6 + (index * 88 / Math.max(1, points.length - 1));
+      const y = 8 + ((100 - point.score) * 42 / 100);
+      return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
+    });
+    const linePath = plot.map((point, index) => `${index ? 'L' : 'M'}${point.x} ${point.y}`).join(' ');
+    const areaPath = `${linePath} L${plot[plot.length - 1].x} 54 L${plot[0].x} 54 Z`;
+    return `
+      <svg class="trend-chart" viewBox="0 0 100 60" role="img" aria-label="${t('progress_over_time')}">
+        <path class="trend-chart__grid" d="M6 8H94M6 29H94M6 50H94"/>
+        <path class="trend-chart__area" d="${areaPath}"/>
+        <path class="trend-chart__line" d="${linePath}"/>
+        ${plot.map(point => `<circle class="trend-chart__dot" cx="${point.x}" cy="${point.y}" r="2.2"/>`).join('')}
+      </svg>`;
+  },
+
+  _renderMonthGrid(year, month) {
+    const days = StreakManager.getMonthData(year, month);
+    return days.map(day => {
+      if (day.type === 'padding') return `<div class="calendar-cell padding"></div>`;
+      const hasActivity = day.status === 'done' || day.status === 'activity';
+      const onClick = hasActivity ? `onclick="event.stopPropagation(); Views.stats._showDayDetails('${day.date}', this)"` : '';
+      return `<button type="button" class="calendar-cell calendar-cell--${day.status} ${day.isToday ? 'today' : ''}"
+                   title="${day.date}" ${onClick} aria-label="${day.date}">
+                <span class="calendar-cell__num">${day.dayNum}</span>
+                <span class="calendar-cell__marker"></span>
+              </button>`;
+    }).join('');
+  },
+};
+
+// ==================== BOOT ====================
+document.addEventListener('DOMContentLoaded', () => App.init());

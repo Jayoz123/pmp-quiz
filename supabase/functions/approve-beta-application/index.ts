@@ -60,6 +60,13 @@ const inviteEmailHtml = (name: string | null, code: string) => {
     <p>Kod sluzy do zalozenia jednego konta. Przy rejestracji wpisz email, haslo, nick i powyzszy kod.</p>
     <p>Najbardziej zalezy mi na feedbacku po kilku quizach: czy pytania sa zrozumiale, czy statystyki pomagaja i czy aplikacja jest wygodna na telefonie.</p>
     <p>Dzieki za pomoc,<br>PM Academy</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+    <p style="font-size:12px;color:#64748b;line-height:1.5">
+      Otrzymujesz tego maila, bo zapisales sie do bety PM Academy na
+      <a href="https://pmp.nord-star.pl" style="color:#64748b">pmp.nord-star.pl</a>.
+      Jesli to pomylka albo nie chcesz dalszych wiadomosci, odpisz na tego maila z trescia "wypisz".
+    </p>
+    <p style="font-size:12px;color:#64748b">PM Academy &middot; nord-star.pl</p>
   </body>
 </html>`
 }
@@ -81,7 +88,12 @@ Kod sluzy do zalozenia jednego konta. Przy rejestracji wpisz email, haslo, nick 
 Najbardziej zalezy mi na feedbacku po kilku quizach: czy pytania sa zrozumiale, czy statystyki pomagaja i czy aplikacja jest wygodna na telefonie.
 
 Dzieki za pomoc,
-PM Academy`
+PM Academy
+
+--
+Otrzymujesz tego maila, bo zapisales sie do bety PM Academy na pmp.nord-star.pl.
+Jesli to pomylka albo nie chcesz dalszych wiadomosci, odpisz na tego maila z trescia "wypisz".
+PM Academy - nord-star.pl`
 }
 
 Deno.serve(async (req) => {
@@ -240,9 +252,13 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       sender: { email: senderEmail, name: senderName },
       to: [{ email: normalizedEmail, name: application.name || undefined }],
+      replyTo: { email: senderEmail, name: senderName },
       subject: 'Dostep testowy do PM Academy',
       htmlContent: inviteEmailHtml(application.name, code),
       textContent: inviteEmailText(application.name, code),
+      headers: {
+        'List-Unsubscribe': `<mailto:${senderEmail}?subject=unsubscribe>`,
+      },
     }),
   })
 

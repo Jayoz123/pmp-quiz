@@ -2817,4 +2817,29 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 .admin-date { color: var(--text2); font-size: 0.8rem; margin-left: auto; }
 .admin-error {
   color: var(--red);
-  backgrou
+  background: var(--red-light);
+  border-radius: var(--radius-xs);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  margin: 0 0 12px;
+  word-break: break-word;
+}
+.admin-card__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-action { flex: 1; min-width: 140px; }
+.admin-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.admin-badge.is-new { background: var(--accent-light); color: var(--accent); }
+.admin-badge.is-approved { background: var(--surface2); color: var(--text2); }
+.admin-badge.is-sent { background: rgba(24,169,153,0.16); color: var(--green); }
+.admin-badge.is-rejected { background: var(--surface2); color: var(--text2); }
+.admin-badge.is-failed { background: var(--red-light); color: var(--red); }
+@media (max-width: 520px) {
+  .admin-date { margin-left: 0; }
+  .admin-action { flex: 1 1 100%; }
+}
