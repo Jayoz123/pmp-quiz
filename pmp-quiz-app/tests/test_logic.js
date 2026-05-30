@@ -1398,6 +1398,16 @@ test('weak questions moved to CUSTOM section via _toggleWeak', () => {
   assert(appSource.includes("filter-section--weak"), 'weak section should be rendered inside filters-advanced');
   assert(appSource.includes("Views['mode-select']._toggleWeak()"), 'weak toggle should call _toggleWeak');
 });
+test('_setScope("auto") clears filters and weak (app picks all params)', () => {
+  const start = appSource.indexOf('_setScope(mode)');
+  assert(start !== -1, '_setScope should exist');
+  const end = appSource.indexOf('App.render()', start);
+  const body = appSource.slice(start, end);
+  assert(/this\._filters\s*=\s*emptyFilters\(\)/.test(body), 'AUTO branch must reset _filters');
+  assert(/this\._selectedMode\s*=\s*'quick'/.test(body), 'AUTO branch must reset _selectedMode to quick');
+  assert(/this\._preset\s*=\s*'all'/.test(body), 'AUTO branch must reset _preset to all');
+  assert(/if\s*\(\s*!next\s*\)/.test(body), 'reset must be guarded by !next (only on AUTO, not CUSTOM)');
+});
 test('_toggleFilter preserves weak mode (does not unconditionally reset _selectedMode)', () => {
   const start = appSource.indexOf('_toggleFilter(axis, value)');
   assert(start !== -1, '_toggleFilter should exist');

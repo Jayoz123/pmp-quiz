@@ -3,7 +3,7 @@
 // ==================== VERSION ====================
 // UWAGA: APP_VERSION generowany przez tools/build.py — nie edytuj ręcznie.
 // Uruchom 'python tools/build.py' przed deployem (CI robi to automatycznie).
-const APP_VERSION = 'build-7b60e9dd';  // placeholder, nadpisywany przez build.py
+const APP_VERSION = 'build-154df6ad';  // placeholder, nadpisywany przez build.py
 
 // ==================== SUPABASE ====================
 const SUPABASE_URL  = 'https://otxfzzlenddvmoxxxaix.supabase.co';
@@ -3325,6 +3325,13 @@ Views['mode-select'] = {
     const next = mode === 'custom';
     if (this._advanced === next) return;
     this._advanced = next;
+    // AUTO = aplikacja sama dobiera parametry → czyścimy filtry i weak.
+    // CUSTOM nie rusza istniejącego stanu (zachowuje to, co użytkownik klika).
+    if (!next) {
+      this._filters = emptyFilters();
+      this._selectedMode = 'quick';
+      this._preset = 'all';
+    }
     App.render();
   },
 
